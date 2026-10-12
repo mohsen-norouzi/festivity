@@ -1,30 +1,86 @@
 import * as THREE from 'three'
+import { createWirePhysics, WIRE_RADIUS } from './wirePhysics'
 
 export function createOrbits(parent: THREE.Group) {
   const group = new THREE.Group()
+  const bubbleGroup = new THREE.Group()
+  group.add(bubbleGroup)
   parent.add(group)
-  class Orbit extends THREE.Curve<THREE.Vector3> {
-    constructor() { super() }
-    getPoint(t: number, target = new THREE.Vector3()) {
-      const angle = t * Math.PI * 2
-      return target.set(4.55 * Math.cos(angle), .77 * Math.sin(angle), 2.95 * Math.sin(angle))
-    }
+  const wire = createWirePhysics()
+  const renderNodes = wire.positions.map(position => position.clone())
+  const curve = new THREE.CatmullRomCurve3(renderNodes, true, 'centripetal')
+  const segments = wire.positions.length * 2
+  const sides = 8
+  const centers = Array.from({ length: segments + 1 }, () => new THREE.Vector3())
+  const tangents = centers.map(() => new THREE.Vector3())
+  const frames = centers.map(() => new THREE.Vector3())
+  const positions = new Float32Array((segments + 1) * sides * 3)
+  const normals = new Float32Array(positions.length)
+  const indices: number[] = []
+  for (let i = 0; i < segments; i++) for (let j = 0; j < sides; j++) {
+    const a = i * sides + j, b = i * sides + (j + 1) % sides
+    const c = a + sides, d = b + sides
+    indices.push(a, b, c, b, d, c)
   }
-  const path = new Orbit()
-  const geometry = new THREE.TubeGeometry(path, 192, .009, 6, true)
-  const material = new THREE.MeshPhysicalMaterial({ color: '#e1d5f6', metalness: .75, roughness: .2, envMapIntensity: 1.8, clearcoat: .5, dithering: true })
+  const geometry = new THREE.BufferGeometry()
+  const positionAttribute = new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage)
+  const normalAttribute = new THREE.BufferAttribute(normals, 3).setUsage(THREE.DynamicDrawUsage)
+  geometry.setAttribute('position', positionAttribute)
+  geometry.setAttribute('normal', normalAttribute)
+  geometry.setIndex(indices)
+  const material = new THREE.MeshPhysicalMaterial({ color: '#dfd2ee', metalness: .68, roughness: .27, envMapIntensity: 1.4, clearcoat: .35, dithering: true })
   const orbit = new THREE.Mesh(geometry, material)
+  orbit.frustumCulled = false
   group.add(orbit)
+  const normal = new THREE.Vector3()
+  const binormal = new THREE.Vector3()
+  const seamNormal = new THREE.Vector3()
+  const cross = new THREE.Vector3()
+  const up = new THREE.Vector3(0, 1, 0)
+
   const bubbleGeometry = new THREE.SphereGeometry(1, 32, 24)
   const bubbleMaterial = new THREE.MeshPhysicalMaterial({ color: '#f7efff', roughness: .065, metalness: 0, transmission: .92, thickness: .3, ior: 1.34, iridescence: .8, iridescenceIOR: 1.3, iridescenceThicknessRange: [100, 410], clearcoat: 1, clearcoatRoughness: .08, envMapIntensity: 1.8, dithering: true })
   const bubbles = new THREE.InstancedMesh(bubbleGeometry, bubbleMaterial, 5)
-  group.add(bubbles)
+  bubbleGroup.add(bubbles)
   const dummy = new THREE.Object3D()
-  const positions = [new THREE.Vector3(-3.65, 1.2, 1.4), new THREE.Vector3(3.45, 1.2, 1.7), new THREE.Vector3(-4.05, -1.15, 1.3), new THREE.Vector3(2.4, 2.8, -.8), new THREE.Vector3(.15, -2.65, 2.3)]
+  const bubblePositions = [new THREE.Vector3(-3.65, 1.2, 1.4), new THREE.Vector3(3.45, 1.2, 1.7), new THREE.Vector3(-4.05, -1.15, 1.3), new THREE.Vector3(2.4, 2.8, -.8), new THREE.Vector3(.15, -2.65, 2.3)]
   const sizes = [.23, .2, .27, .14, .115]
-  const update = (time: number) => {
-    group.rotation.z = -.17 + Math.sin(time * .15) * .025
-    positions.forEach((position, i) => {
+  const update = (time: number, alpha = 1) => {
+    renderNodes.forEach((point, i) => point.lerpVectors(wire.previous[i], wire.positions[i], alpha))
+    for (let i = 0; i < segments; i++) curve.getPoint(i / segments, centers[i])
+    centers[segments].copy(centers[0])
+    for (let i = 0; i < segments; i++) tangents[i].subVectors(centers[(i + 1) % segments], centers[(i + segments - 1) % segments]).normalize()
+    tangents[segments].copy(tangents[0])
+    frames[0].crossVectors(tangents[0], up)
+    if (frames[0].lengthSq() < .0001) frames[0].set(1, 0, 0)
+    frames[0].normalize()
+    // Parallel transport keeps reflections continuous as the wire bends.
+    for (let i = 1; i <= segments; i++) {
+      frames[i].copy(frames[i - 1]).addScaledVector(tangents[i], -frames[i - 1].dot(tangents[i]))
+      if (frames[i].lengthSq() < .0001) frames[i].crossVectors(tangents[i], up)
+      frames[i].normalize()
+    }
+    seamNormal.copy(frames[segments])
+    const seamAngle = Math.atan2(tangents[0].dot(cross.crossVectors(seamNormal, frames[0])), seamNormal.dot(frames[0]))
+    for (let i = 0; i <= segments; i++) {
+      normal.copy(frames[i]).applyAxisAngle(tangents[i], seamAngle * i / segments)
+      binormal.crossVectors(tangents[i], normal).normalize()
+      for (let j = 0; j < sides; j++) {
+        const angle = j / sides * Math.PI * 2
+        const nx = normal.x * Math.cos(angle) + binormal.x * Math.sin(angle)
+        const ny = normal.y * Math.cos(angle) + binormal.y * Math.sin(angle)
+        const nz = normal.z * Math.cos(angle) + binormal.z * Math.sin(angle)
+        const offset = (i * sides + j) * 3
+        positions[offset] = centers[i].x + nx * WIRE_RADIUS
+        positions[offset + 1] = centers[i].y + ny * WIRE_RADIUS
+        positions[offset + 2] = centers[i].z + nz * WIRE_RADIUS
+        normals[offset] = nx; normals[offset + 1] = ny; normals[offset + 2] = nz
+      }
+    }
+    positionAttribute.needsUpdate = true
+    normalAttribute.needsUpdate = true
+    bubbleGroup.rotation.z = -.17 + Math.sin(time * .15) * .025
+    bubblePositions.forEach((position, i) => {
       dummy.position.copy(position)
       dummy.position.y += Math.sin(time * .4 + i * 1.6) * .1
       dummy.scale.setScalar(sizes[i])
@@ -34,5 +90,5 @@ export function createOrbits(parent: THREE.Group) {
     bubbles.instanceMatrix.needsUpdate = true
   }
   update(0)
-  return { update, dispose() { geometry.dispose(); material.dispose(); bubbleGeometry.dispose(); bubbleMaterial.dispose(); bubbles.dispose(); parent.remove(group) } }
+  return { wire, update, dispose() { geometry.dispose(); material.dispose(); bubbleGeometry.dispose(); bubbleMaterial.dispose(); bubbles.dispose(); parent.remove(group) } }
 }

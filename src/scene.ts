@@ -12,6 +12,8 @@ export interface OrnamentScene {
 }
 
 interface Body {
+  halfSize: THREE.Vector3
+  shapePower: number
   home: THREE.Vector3
   rest: THREE.Quaternion
   object: THREE.Group
@@ -218,7 +220,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     const home = new THREE.Vector3(...piece.p)
     if (index < 22) { home.x *= .94; home.y *= .9; home.z *= 1.1 }
     const rest = new THREE.Quaternion().setFromEuler(new THREE.Euler(...(piece.tilt ?? [.2, .2, .2])))
-    bodies.push({ home, rest, object, position: home.clone(), previous: home.clone(), velocity: new THREE.Vector3(), rotation: rest.clone(), spin: new THREE.Vector3(), radius: piece.r, mass: piece.r ** 3, phase: random() * Math.PI * 2 })
+    bodies.push({ halfSize: geometry.boundingBox!.max.clone().multiplyScalar(piece.r), shapePower: piece.form === 'capsule' ? 2.8 : 3.8, home, rest, object, position: home.clone(), previous: home.clone(), velocity: new THREE.Vector3(), rotation: rest.clone(), spin: new THREE.Vector3(), radius: piece.r, mass: piece.r ** 3, phase: random() * Math.PI * 2 })
   })
 
   const fillBodies = () => {
@@ -306,10 +308,11 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         body.rotation.slerp(body.rest, 1 - Math.exp(-.45 * dt))
       }
     }
+    orbits.wire.step(dt, bodies, elapsed, settling)
   }
 
   const updateInstances = (alpha = 1) => {
-    orbits.update(elapsed)
+    orbits.update(elapsed, alpha)
     cluster.rotation.y = Math.sin(elapsed * .14) * .025
     cluster.rotation.z = Math.sin(elapsed * .2) * .014
     cluster.updateMatrixWorld(true)
@@ -328,8 +331,10 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     cursor.classList.remove('is-dragging')
     elapsed = 0
     fillBodies()
+    orbits.wire.reset()
     for (let i = 0; i < 240; i++) step(STEP, true)
     for (const body of bodies) { body.velocity.set(0, 0, 0); body.previous.copy(body.position) }
+    orbits.wire.rest()
     updateInstances()
     needsRender = true
   }
@@ -443,6 +448,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         host.dataset.fps = ((frameCount * 1000) / (now - sampleTime)).toFixed(0)
         host.dataset.drawCalls = String(renderer.info.render.calls)
         host.dataset.triangles = String(renderer.info.render.triangles)
+        host.dataset.wireContacts = String(orbits.wire.contacts)
         frameCount = 0; sampleTime = now
       }
     }

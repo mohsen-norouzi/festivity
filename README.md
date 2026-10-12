@@ -20,7 +20,7 @@ bun run preview
 ## Interactions
 
 - Move through the sculpture to push the shapes.
-- Hold and drag a piece; release it to let it settle.
+- Hold and drag a piece; release it to let it settle. Cubes bend the wire, and wire tension gently pushes and turns them in return.
 - Click **M** to scatter the composition.
 - Pause, resume, and reset from the footer or menu.
 - Touch dragging and reduced-motion preferences are supported.
@@ -29,8 +29,9 @@ bun run preview
 
 - `src/scene.ts`: 26 physical bodies, fixed 90 Hz simulation, interpolated motion, smooth superellipsoid geometry with analytic normals, and physical materials.
 - `src/musicIcons.ts`: beveled music symbols from official Phosphor SVG contours and the Lucide cloud silhouette. Icons render after transmission to avoid ghosted refraction.
-- `src/orbits.ts`: one reflective orbital curve and five instanced iridescent glass bubbles.
+- `src/orbits.ts`: a dynamically updated cable mesh with continuous transported normals, plus five instanced iridescent glass bubbles.
 - `src/studio.ts`: a baked studio environment, feathered softboxes, and a procedural gradient backdrop with soft diagonal light streaks.
+- `src/wirePhysics.ts`: a 96-node closed cable with stretch/bending constraints, a weak rest spring, traveling loads, and two-way rounded-cube contact at the same 90 Hz fixed step. Node and segment contacts keep the wire outside the cube surfaces.
 - `src/contactLighting.ts`: all-neighbor contact lighting compressed into directional coefficients, with three texture samples per vertex and no nearest-neighbor switching.
 - `src/App.tsx` and `src/style.css`: accessible controls and responsive hero layout.
 
@@ -39,3 +40,7 @@ Native MSAA and 1.5–2× rendering preserve edges within a five-million-pixel b
 Icon sources: [Phosphor](https://github.com/phosphor-icons/core) and [Lucide](https://github.com/lucide-icons/lucide). The original licenses are included in `src/assets/icons/`. SVG geometry is generated once; icons are served locally, without an icon API.
 
 React + TypeScript + Vite + Bun + Tailwind CSS + Three.js. Festivity is an experiment name, not the final platform identity.
+
+## Physics checks
+
+Run `bun test` for cable stretch/stability, reciprocal cube reaction, rounded-surface clearance during dragging, wave propagation/damping, and deterministic reset.
