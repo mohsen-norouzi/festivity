@@ -1,11 +1,6 @@
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
-import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js'
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
-import { FXAAShader } from 'three/addons/shaders/FXAAShader.js'
+import { createContactLighting } from './contactLighting'
 
 export interface OrnamentScene {
   dispose: () => void
@@ -39,13 +34,14 @@ function randomGenerator(seed: number) {
 
 /** A small fixed-step sphere solver: attractive force, contact impulses, and drag springs. */
 export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement, onReady: () => void, onError: () => void): OrnamentScene {
-  const renderer = new THREE.WebGLRenderer({ alpha: true, premultipliedAlpha: false, antialias: true, powerPreference: 'high-performance' })
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' })
   renderer.setClearColor(0x000000, 0)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.35))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.05
   renderer.outputColorSpace = THREE.SRGBColorSpace
   host.appendChild(renderer.domElement)
+  const sampleCount = renderer.getContext().getParameter(renderer.getContext().SAMPLES) as number
 
   const scene = new THREE.Scene()
   const camera = new THREE.OrthographicCamera(-6, 6, 3.5, -3.5, .1, 60)
@@ -62,7 +58,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   room.dispose()
   pmrem.dispose()
 
-  scene.add(new THREE.HemisphereLight(0xfff9f5, 0xff8e91, 1.6))
+  scene.add(new THREE.HemisphereLight(0xfff9f5, 0xffb2b1, 1.65))
   const key = new THREE.DirectionalLight(0xfffaf4, 4.2)
   key.position.set(-3, 6, 4)
   scene.add(key)
@@ -74,12 +70,13 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   scene.add(rim)
 
   const pink = new THREE.MeshPhysicalMaterial({
-    color: 0xffb2b8, roughness: .54, metalness: 0,
-    clearcoat: .035, clearcoatRoughness: .45, envMapIntensity: .6, specularIntensity: .55,
+    color: 0xffb9bf, roughness: .39, metalness: 0,
+    clearcoat: .12, clearcoatRoughness: .3, envMapIntensity: .65, specularIntensity: .65,
   })
-  const gold = new THREE.MeshStandardMaterial({ color: 0xd7a573, metalness: .88, roughness: .27, envMapIntensity: 1.4 })
-  const sphereGeometry = new THREE.SphereGeometry(1, 40, 28)
-  const capGeometry = new THREE.CylinderGeometry(.13, .165, .13, 32, 1)
+  const gold = new THREE.MeshStandardMaterial({ color: 0xdbb790, metalness: .95, roughness: .23, envMapIntensity: 1.4 })
+  const sphereGeometry = new THREE.SphereGeometry(1, 64, 48)
+  const contactLighting = createContactLighting(COUNT, sphereGeometry, pink)
+  const capGeometry = new THREE.CylinderGeometry(.13, .165, .13, 64, 1)
   // Shallow radial flutes catch the studio reflections like stamped metal.
   const capPositions = capGeometry.getAttribute('position')
   for (let i = 0; i < capPositions.count; i++) {
@@ -89,9 +86,9 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     capPositions.setZ(i, z * scale)
   }
   capGeometry.computeVertexNormals()
-  const lipGeometry = new THREE.TorusGeometry(.135, .015, 6, 32)
+  const lipGeometry = new THREE.TorusGeometry(.135, .015, 8, 40)
   lipGeometry.rotateX(Math.PI / 2)
-  const loopGeometry = new THREE.TorusGeometry(.083, .018, 8, 28)
+  const loopGeometry = new THREE.TorusGeometry(.083, .018, 10, 40)
   const balls = new THREE.InstancedMesh(sphereGeometry, pink, COUNT)
   const caps = new THREE.InstancedMesh(capGeometry, gold, COUNT)
   const lips = new THREE.InstancedMesh(lipGeometry, gold, COUNT)
@@ -102,30 +99,6 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     mesh.frustumCulled = false
     cluster.add(mesh)
   })
-
-  const renderTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 })
-  const composer = new EffectComposer(renderer, renderTarget)
-  const renderPass = new RenderPass(scene, camera)
-  const ao = new GTAOPass(scene, camera, 1, 1)
-  ao.updateGtaoMaterial({ radius: .8, thickness: 1.6, distanceExponent: 1.4, scale: 1, samples: 16 })
-  ao.updatePdMaterial({ radius: 5, samples: 12, depthPhi: 4, normalPhi: 3 })
-  ao.blendIntensity = .85
-  // Warm occlusion suggests the diffuse pink bounce light between adjacent ornaments.
-  ao.blendMaterial.fragmentShader = ao.blendMaterial.fragmentShader.replace(
-    'mix(vec3(1.), texel.rgb, intensity)',
-    'mix(vec3(1.), pow(max(texel.rgb, vec3(0.001)), vec3(0.45, 1.1, 1.0)), intensity)',
-  )
-  const antialias = new ShaderPass(FXAAShader)
-  const output = new OutputPass()
-  // Resolve coverage before tone mapping so transparent MSAA edges have no white halo.
-  output.material.fragmentShader = output.material.fragmentShader.replace(
-    'gl_FragColor = texture2D( tDiffuse, vUv );',
-    'gl_FragColor = texture2D( tDiffuse, vUv ); if (gl_FragColor.a > 0.0001) gl_FragColor.rgb /= gl_FragColor.a;',
-  )
-  composer.addPass(renderPass)
-  composer.addPass(ao)
-  composer.addPass(antialias)
-  composer.addPass(output)
 
   let random = randomGenerator(2017)
   const bodies: Body[] = []
@@ -255,6 +228,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const updateInstances = (alpha = 1) => {
     bodies.forEach((body, i) => {
       offset.lerpVectors(body.previous, body.position, alpha)
+      contactLighting.setSphere(i, offset, body.radius)
       size.setScalar(body.radius)
       matrix.compose(offset, body.rotation, size)
       balls.setMatrixAt(i, matrix)
@@ -266,6 +240,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       loops.setMatrixAt(i, localMatrix.premultiply(matrix))
     })
     meshes.forEach(mesh => { mesh.instanceMatrix.needsUpdate = true })
+    contactLighting.update()
     cluster.rotation.z = Math.sin(elapsed * .22) * .035
   }
 
@@ -302,12 +277,13 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     camera.bottom = -viewHeight / 2
     camera.updateProjectionMatrix()
     cluster.scale.setScalar(mobile ? .82 : 1)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.35))
+    // Sharper Retina silhouettes, with a pixel budget for large desktop displays.
+    renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio, 1.5), 2, Math.sqrt(5_000_000 / (width * height))))
     renderer.setSize(width, height)
-    composer.setPixelRatio(renderer.getPixelRatio())
-    composer.setSize(width, height)
-    ao.setSize(Math.round(width * renderer.getPixelRatio() * .6), Math.round(height * renderer.getPixelRatio() * .6))
-    antialias.uniforms.resolution.value.set(1 / (width * renderer.getPixelRatio()), 1 / (height * renderer.getPixelRatio()))
+    if (import.meta.env.DEV) {
+      host.dataset.pixelRatio = renderer.getPixelRatio().toFixed(2)
+      host.dataset.msaaSamples = String(sampleCount)
+    }
     needsRender = true
   }
   const resizeObserver = new ResizeObserver(resize)
@@ -387,6 +363,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       if (!sampleTime) sampleTime = now
       if (++frameCount === 120) {
         host.dataset.fps = ((frameCount * 1000) / (now - sampleTime)).toFixed(0)
+        host.dataset.drawCalls = String(renderer.info.render.calls)
+        host.dataset.triangles = String(renderer.info.render.triangles)
         frameCount = 0; sampleTime = now
       }
     }
@@ -403,7 +381,10 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       updateInstances(accumulator / STEP)
       needsRender = true
     }
-    if (needsRender) { composer.render(); needsRender = false }
+    if (needsRender) {
+      renderer.render(scene, camera)
+      needsRender = false
+    }
     if (!hasRendered) { hasRendered = true; onReady() }
   }
   raf = requestAnimationFrame(tick)
@@ -426,7 +407,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       sphereGeometry.dispose(); capGeometry.dispose(); lipGeometry.dispose(); loopGeometry.dispose()
       pink.dispose(); gold.dispose(); environment.dispose()
       meshes.forEach(mesh => mesh.dispose())
-      ao.dispose(); antialias.dispose(); output.dispose(); renderPass.dispose(); composer.dispose()
+      contactLighting.dispose()
       renderer.dispose()
       renderer.domElement.remove()
       cursor.classList.remove('visible', 'is-dragging')

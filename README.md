@@ -29,10 +29,11 @@ bun run preview
 ## Structure
 
 - `src/scene.ts` — Three.js rendering, procedural geometry, studio lighting, contact shading, fixed-step sphere collisions, and pointer interaction.
+- `src/contactLighting.ts` — continuous contact lighting using each sphere's eight nearest neighbors, without screen-space shadow artifacts.
 - `src/App.tsx` — React hero and accessible controls.
 - `src/style.css` — Tailwind import, responsive layout, typography, and cursor.
 - `public/fonts` — locally served Anton and Inter with their open-font licenses.
 
-React + TypeScript + Vite + Bun + Tailwind CSS + Three.js. Instanced geometry keeps the ornament draw calls low; contact shading runs at a lower resolution. Physics uses a fixed 90 Hz step with interpolation. Paused scenes stop rendering, and hidden tabs suspend their simulation. All visual assets are procedural; no external image or model service is needed at runtime.
+React + TypeScript + Vite + Bun + Tailwind CSS + Three.js. The entire ornament scene uses four instanced draw calls and a single rendering pass. Smooth 64 × 48 sphere geometry, native MSAA, and 1.5–2× render resolution keep edges clean, with a five-million-pixel budget for larger displays. Continuous contact lighting replaces the former low-resolution GTAO and blur passes. Physics uses a fixed 90 Hz step with interpolation. Paused scenes stop rendering, and hidden tabs suspend their simulation. All visual assets are procedural; no external image or model service is needed at runtime.
 
 This is a visual experiment, not a final music-platform identity. The frame-by-frame shape differs from the video because the scene is a live simulation.
