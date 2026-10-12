@@ -22,11 +22,11 @@ bun run preview
 - Move through the sculpture to push the shapes.
 - Hold and drag a piece; release it to let it settle. Cubes bend the wire, and wire tension gently pushes and turns them in return.
 - Click a shape to toggle its music and individual reaction. Waveform bars animate independently, the heart changes through warm colors and beats, the black text tile gains golden lettering, notes sway, headphones pulse, clouds float, globes turn, and stars twinkle. Body materials stay original except for the heart. Selecting another shape returns the previous reaction to rest.
-- Use the floating player to pause/resume music; the speaker control mutes both music and pops. Music begins only after a gesture, pauses while the tab is hidden, and stops on reset.
+- Use the floating player to pause/resume music. The header menu opens the MUSYNC Mix: seven local tracks with live selection, keyboard navigation, and matching sculpture reactions. Music begins only after a gesture, pauses while the tab is hidden, and stops on reset.
 - Every click also adds one inflation puff, including clicks that turn music off. Five clicks pop the shape. Holding and dragging do not add air. A matching replacement floats in.
 - Oil stretches, falls, and leaves wet patches on the moving shapes. Reset clears both pressure and oil.
 - Click the large MUSYNC play/waveform symbol to scatter the composition.
-- Pause, resume, and reset from the footer or menu.
+- The footer shows a small spinning record and the current title/artist. Reset by clicking the header logo. The footer and menu contain no animation, fullscreen, reset, or mute controls.
 - Touch dragging and reduced-motion preferences are supported.
 
 ## Rendering

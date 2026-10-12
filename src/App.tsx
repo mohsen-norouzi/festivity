@@ -1,7 +1,7 @@
 import noteIcon from './assets/icons/music-notes-fill.svg'
 import heartIcon from './assets/icons/heart-fill.svg'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { MUSIC_MOODS, type MusicState } from './musicMoods'
+import { MUSIC_MOODS, type MoodId, type MusicState } from './musicMoods'
 import type { OrnamentScene } from './scene'
 
 function PauseIcon({ paused }: { paused: boolean }) {
@@ -10,17 +10,7 @@ function PauseIcon({ paused }: { paused: boolean }) {
     : <svg viewBox="0 0 20 20"><path d="M7 4v12M13 4v12" strokeWidth="2.5" /></svg>
 }
 
-function ResetIcon() {
-  return <svg viewBox="0 0 20 20"><path d="M4.2 7.2a6 6 0 1 1-.1 5.3M4 3v4.5h4.5" /></svg>
-}
-
-function ExpandIcon() {
-  return <svg viewBox="0 0 20 20"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4" /></svg>
-}
-
-function SoundIcon({ enabled }: { enabled: boolean }) {
-  return <svg viewBox="0 0 20 20"><path d="M9 4 5 7H2v6h3l4 3Z" />{enabled ? <path d="M12 6a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /> : <path d="m13 7 5 6m0-6-5 6" />}</svg>
-}
+const tracks = Object.entries(MUSIC_MOODS) as [MoodId, (typeof MUSIC_MOODS)[MoodId]][]
 
 export default function App() {
   const host = useRef<HTMLDivElement>(null)
@@ -32,14 +22,12 @@ export default function App() {
   const [error, setError] = useState(false)
   const [paused, setPaused] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [fullscreen, setFullscreen] = useState(false)
   const [resetCount, setResetCount] = useState(0)
-  const [soundEnabled, setSoundEnabled] = useState(true)
   const [music, setMusic] = useState<MusicState>({ mood: null, playing: false, audible: false })
   const song = music.mood ? MUSIC_MOODS[music.mood] : null
 
-  const preferences = useRef({ paused, soundEnabled })
-  preferences.current = { paused, soundEnabled }
+  const preferences = useRef({ paused })
+  preferences.current = { paused }
 
   useEffect(() => {
     let cancelled = false
@@ -57,7 +45,6 @@ export default function App() {
             state => { if (!cancelled) setMusic(state) })
           scene.current = instance
           instance.setPaused(preferences.current.paused)
-          if (!preferences.current.soundEnabled) instance.setSoundEnabled(false)
         } catch (cause) {
           if (cancelled) return
           console.error('Unable to initialize the music sculpture', cause)
@@ -76,14 +63,16 @@ export default function App() {
   useEffect(() => { scene.current?.setPaused(paused) }, [paused])
 
   useEffect(() => {
-    const handleFullscreen = () => setFullscreen(Boolean(document.fullscreenElement))
-    document.addEventListener('fullscreenchange', handleFullscreen)
-    return () => document.removeEventListener('fullscreenchange', handleFullscreen)
+    const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const onChange = () => setPaused(preference.matches)
+    preference.addEventListener('change', onChange)
+    return () => preference.removeEventListener('change', onChange)
   }, [])
 
   useEffect(() => {
     if (!menuOpen) return
-    menu.current?.querySelector<HTMLButtonElement>('button')?.focus()
+    const currentTrack = menu.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')
+    ;(currentTrack ?? menu.current?.querySelector<HTMLButtonElement>('button'))?.focus()
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { setMenuOpen(false); menuButton.current?.focus() }
     }
@@ -103,23 +92,7 @@ export default function App() {
     setResetCount(count => count + 1)
   }
 
-  const scatter = () => {
-    scene.current?.setPaused(false)
-    setPaused(false)
-    scene.current?.scatter()
-  }
-
-  const toggleSound = () => {
-    scene.current?.setSoundEnabled(!soundEnabled)
-    setSoundEnabled(value => !value)
-  }
-
-  const toggleFullscreen = async () => {
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen()
-      else await document.documentElement.requestFullscreen()
-    } catch { /* Some embedded previews disable the Fullscreen API. */ }
-  }
+  const scatter = () => scene.current?.scatter()
 
   return (
     <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''} ${music.audible ? 'is-music-playing' : ''} ${song ? 'has-music' : ''}`} style={{ '--mood-accent': song?.accent ?? '#e5c4ff' } as CSSProperties}>
@@ -132,17 +105,39 @@ export default function App() {
         <div className="study-index hidden items-center justify-between md:flex" aria-label="An ecosystem for artists, fans, and Dream Movers">
           <span>ARTISTS</span><span>FANS</span><span>DREAM MOVERS</span><span>OWNERSHIP</span><span>CONNECTION</span>
         </div>
-        <button ref={menuButton} className={`menu-button icon-button ${menuOpen ? 'is-open' : ''}`} aria-label={menuOpen ? 'Close experiment controls' : 'Open experiment controls'} aria-expanded={menuOpen} aria-controls="experiment-controls" onClick={() => setMenuOpen(open => !open)}>
+        <button ref={menuButton} className={`menu-button icon-button ${menuOpen ? 'is-open' : ''}`} aria-label={menuOpen ? 'Close the MUSYNC mix' : 'Explore the MUSYNC mix'} aria-expanded={menuOpen} aria-controls="musync-mix" onClick={() => setMenuOpen(open => !open)}>
           <span /><span /><span />
         </button>
       </header>
 
-      {menuOpen && <div id="experiment-controls" ref={menu} className="control-menu absolute z-30">
-        <p className="menu-eyebrow">MUSYNC / SOUND CONTROLS</p>
-        <button onClick={() => setPaused(value => !value)}><span>{paused ? 'Resume motion' : 'Pause motion'}</span><PauseIcon paused={paused} /></button>
-        <button onClick={reset}><span>Reset composition</span><ResetIcon /></button>
-        <button onClick={scatter}><span>Scatter shapes</span><span aria-hidden="true">↗</span></button>
-        <p className="menu-hint">Click to toggle a shape’s music and animation.<br />Every click adds air. Five clicks pop it. Drag to move.</p>
+      {menuOpen && <div id="musync-mix" ref={menu} className="mix-menu absolute z-30" role="region" aria-labelledby="mix-heading">
+        <div className="mix-heading">
+          <p className="mix-eyebrow"><span /> THE MUSYNC MIX <span className="mix-count">01—07</span></p>
+          <h2 id="mix-heading">Find your<br /><span>frequency.</span></h2>
+          <p className="mix-intro">Pick a track. Watch it take shape.</p>
+        </div>
+        <ul className="mix-tracks" aria-label="Choose a track" onKeyDown={event => {
+          if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+          const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button')]
+          const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
+          if (index < 0) return
+          event.preventDefault()
+          const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
+          buttons[next]?.focus()
+        }}>
+          {tracks.map(([id, track], index) => {
+            const selected = music.mood === id
+            const isPlaying = selected && music.playing
+            return <li key={id}>
+              <button className={`mix-track ${selected ? 'is-selected' : ''} ${selected && music.audible ? 'is-playing' : ''}`} style={{ '--track-accent': track.accent, '--track-deep': track.deep } as CSSProperties} disabled={!ready} onClick={() => scene.current?.selectTrack(id)} aria-label={`${isPlaying ? 'Pause' : 'Play'} ${track.name} by ${track.artist}`} aria-pressed={isPlaying}>
+                <span className={`track-art track-art-${id}`} aria-hidden="true"><img src="/brand/musync-symbol-white.svg" alt="" /></span>
+                <span className="track-copy"><strong>{track.name}</strong><span>{track.artist}</span></span>
+                <span className="track-tail" aria-hidden="true"><span className="track-number">{String(index + 1).padStart(2, '0')}</span><span className="track-bars"><i /><i /><i /></span><span className="track-play"><PauseIcon paused={!isPlaying} /></span></span>
+              </button>
+            </li>
+          })}
+        </ul>
+        <a className="mix-invitation" href="https://www.musync.me/en/#apply" target="_blank" rel="noopener noreferrer"><span>Closer to your artists.</span><span>Join MUSYNC <span aria-hidden="true">↗</span></span></a>
       </div>}
 
       <div className="study-caption absolute z-10 pointer-events-none">
@@ -181,12 +176,13 @@ export default function App() {
       <footer className="hero-footer absolute inset-x-0 bottom-0 z-20 flex items-end justify-between">
         <div className="material-caption"><p className="font-semibold">No middlemen.</p><p>Closer to your fans.</p></div>
         <p className="hero-title">ANYWHERE. FOR ANYONE.</p>
-        <div className="simulation-controls flex items-center">
-          <span className="simulation-label">{paused ? 'MOTION PAUSED' : 'LIVE SIMULATION'}</span>
-          <button className="icon-button" onClick={toggleSound} aria-label={soundEnabled ? 'Mute all audio' : 'Enable audio'} aria-pressed={soundEnabled} title={soundEnabled ? 'Mute all audio' : 'Enable audio'}><SoundIcon enabled={soundEnabled} /></button>
-          <button className="icon-button" onClick={() => setPaused(value => !value)} aria-label={paused ? 'Resume motion' : 'Pause motion'} title={paused ? 'Resume motion' : 'Pause motion'}><PauseIcon paused={paused} /></button>
-          <button className="icon-button" onClick={reset} aria-label="Reset composition" title="Reset composition"><ResetIcon /></button>
-          {document.fullscreenEnabled && <button className="icon-button fullscreen-button" onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}><ExpandIcon /></button>}
+        <div className="rotation-note">
+          <span className="rotation-record" aria-hidden="true"><span /><i /></span>
+          <div className="rotation-copy">
+            <p className="rotation-eyebrow">{music.audible ? 'NOW SPINNING' : song ? 'ON YOUR FREQUENCY' : 'THE MUSYNC MIX'}<span>{song ? `${String(tracks.findIndex(([id]) => id === music.mood) + 1).padStart(2, '0')} / 07` : '07 TRACKS'}</span></p>
+            <p className="rotation-title">{song?.name ?? 'Your next favorite is here.'}</p>
+            <p className="rotation-artist">{song?.artist ?? 'Choose a shape. Find your sound.'}</p>
+          </div>
         </div>
       </footer>
 

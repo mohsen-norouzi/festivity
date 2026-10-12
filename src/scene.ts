@@ -9,7 +9,7 @@ import { createBurstAudio } from './burstAudio'
 import { createEntrance, shuffledIndices } from './entrance'
 import { createMusicAudio } from './musicAudio'
 import { createMusicVisuals } from './musicVisuals'
-import type { MusicState } from './musicMoods'
+import type { MoodId, MusicState } from './musicMoods'
 import { createTileReactions, type ReactionKind } from './tileReactions'
 
 export interface OrnamentScene {
@@ -17,6 +17,7 @@ export interface OrnamentScene {
   reset: () => void
   scatter: () => void
   toggleMusic: () => void
+  selectTrack: (mood: MoodId) => void
   setPaused: (paused: boolean) => void
   setSoundEnabled: (enabled: boolean) => void
 }
@@ -794,6 +795,11 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   return {
     reset, scatter,
     toggleMusic() { if (selectedMusic < 0) selectMusic(0); else music.toggle() },
+    selectTrack(mood) {
+      if (musicState.mood === mood && selectedMusic >= 0) { music.toggle(); return }
+      const index = mood === 'bubble' ? COUNT : pieces.findIndex(piece => piece.finish === mood)
+      if (index >= 0) selectMusic(index)
+    },
     setPaused(value) {
       paused = value; accumulator = 0; needsRender = true
       if (value) {
