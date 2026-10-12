@@ -80,5 +80,5 @@ export function createStudio(renderer: THREE.WebGLRenderer, scene: THREE.Scene) 
   cool.position.set(4, 2, 2); scene.add(cool)
   const bounce = new THREE.DirectionalLight('#ff9f70', 2.0)
   bounce.position.set(-4, -3, 1); scene.add(bounce)
-  return { dispose() { environment.dispose(); background.dispose() } }
+  return { background, dispose() { environment.dispose(); background.dispose() } }
 }

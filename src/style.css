@@ -147,3 +147,31 @@ svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width:
 @keyframes signal-breathe { to { scale: 1 .5; opacity: .35; } }
 
 .is-paused .floating-card { animation-play-state: running, paused; }
+
+.music-player { min-width: 260px; gap: 13px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.music-copy { display: grid; gap: 2px; text-align: left; }
+.music-copy strong { font-size: 13px; font-weight: 500; letter-spacing: .01em; }
+.music-eyebrow { font-size: 7px; letter-spacing: .19em; opacity: .65; margin-bottom: 3px; }
+.music-subtitle { font-size: 10px; opacity: .75; }
+.music-player .card-action { margin-left: auto; flex-shrink: 0; }
+.card-action svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; }
+.music-meter { width: 33px; height: 36px; display: flex; align-items: center; justify-content: center; gap: 3px; flex-shrink: 0; }
+.music-meter i { width: 3px; height: 12px; border-radius: 5px; background: currentColor; transform: scaleY(.6); transition: color 1s, transform .2s; }
+.music-meter i:nth-child(2), .music-meter i:nth-child(4) { height: 23px; }
+.music-meter i:nth-child(3) { height: 33px; }
+.has-music .music-player { border-color: color-mix(in srgb, var(--mood-accent) 65%, transparent); box-shadow: inset 0 0 24px rgb(255 255 255 / .04), 0 0 30px color-mix(in srgb, var(--mood-accent) 8%, transparent); }
+.has-music .music-meter { color: var(--mood-accent); }
+.is-music-playing .music-meter i { animation: music-meter .8s ease-in-out infinite alternate; }
+.is-music-playing .music-meter i:nth-child(2) { animation-delay: -.35s; }
+.is-music-playing .music-meter i:nth-child(3) { animation-delay: -.65s; }
+.is-music-playing .music-meter i:nth-child(4) { animation-delay: -.1s; }
+.is-music-playing .music-meter i:nth-child(5) { animation-delay: -.45s; }
+@keyframes music-meter { from { transform: scaleY(.3); } to { transform: scaleY(calc(.55 + var(--music-energy, 0) * .8)); } }
+.is-paused .music-meter i { animation: none; transform: scaleY(.65); }
+@media (max-width: 767px) {
+  .music-player { min-width: 210px; gap: 10px; }
+  .music-copy strong { font-size: 11px; }
+  .music-subtitle { font-size: 9px; }
+  .music-eyebrow { font-size: 6px; }
+  .music-meter { width: 26px; scale: .8; }
+}

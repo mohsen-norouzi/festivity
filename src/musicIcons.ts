@@ -26,6 +26,22 @@ export function createMusicIcons() {
     const parts = loader.parse(svg).paths.flatMap(path => SVGLoader.createShapes(path).map(shape =>
       new THREE.ExtrudeGeometry(shape, { depth: 5, bevelEnabled: true, bevelSize: 1.15, bevelThickness: 1.15, bevelSegments: 2, steps: 1, curveSegments: 14 }),
     ))
+    // Preserve each original contour as a bar ID for a single-draw equalizer.
+    if (name === 'wave' || name === 'pause') {
+      parts.sort((a, b) => {
+        a.computeBoundingBox(); b.computeBoundingBox()
+        return a.boundingBox!.min.x - b.boundingBox!.min.x
+      })
+      parts.forEach((part, index) => {
+        const count = part.getAttribute('position').count
+        part.computeBoundingBox()
+        const centerY = (part.boundingBox!.min.y + part.boundingBox!.max.y) / 2
+        const halfHeight = (part.boundingBox!.max.y - part.boundingBox!.min.y) / 2
+        part.setAttribute('barId', new THREE.BufferAttribute(new Float32Array(count).fill(index), 1))
+        part.setAttribute('barCenter', new THREE.BufferAttribute(new Float32Array(count).fill(centerY), 1))
+        part.setAttribute('barHeight', new THREE.BufferAttribute(new Float32Array(count).fill(halfHeight), 1))
+      })
+    }
     const geometry = mergeGeometries(parts)
     parts.forEach(part => part.dispose())
     geometry.computeBoundingBox()
@@ -35,6 +51,13 @@ export function createMusicIcons() {
     geometry.translate(-center.x, -center.y, -center.z)
     geometry.scale(scale, scale, scale)
     geometry.rotateX(Math.PI)
+    if (name === 'wave' || name === 'pause') {
+      const centers = geometry.getAttribute('barCenter'), heights = geometry.getAttribute('barHeight')
+      for (let i = 0; i < centers.count; i++) {
+        centers.setX(i, -(centers.getX(i) - center.y) * scale)
+        heights.setX(i, heights.getX(i) * scale)
+      }
+    }
     cache.set(name, geometry)
     return geometry
   }

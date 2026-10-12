@@ -7,11 +7,16 @@ import { createBurstLifecycle } from './burstLifecycle'
 import { createBurstEffects } from './burstEffects'
 import { createBurstAudio } from './burstAudio'
 import { createEntrance, shuffledIndices } from './entrance'
+import { createMusicAudio } from './musicAudio'
+import { createMusicVisuals } from './musicVisuals'
+import type { MusicState } from './musicMoods'
+import { createTileReactions, type ReactionKind } from './tileReactions'
 
 export interface OrnamentScene {
   dispose: () => void
   reset: () => void
   scatter: () => void
+  toggleMusic: () => void
   setPaused: (paused: boolean) => void
   setSoundEnabled: (enabled: boolean) => void
 }
@@ -78,7 +83,7 @@ function randomGenerator(seed: number) {
 }
 
 /** A small fixed-step sphere solver: attractive force, contact impulses, and drag springs. */
-export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement, onReady: () => void, onError: () => void): OrnamentScene {
+export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement, onReady: () => void, onError: () => void, onMusic: (state: MusicState) => void): OrnamentScene {
   const startedAt = performance.now()
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' })
   renderer.setClearColor(0x000000, 0)
@@ -100,6 +105,22 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const studio = createStudio(renderer, scene)
   const orbits = createOrbits(cluster)
   const burstAudio = createBurstAudio()
+  let selectedMusic = -1
+  let musicState: MusicState = { mood: null, playing: false, audible: false }
+  const reactions = createTileReactions([
+    ...pieces.map(piece => piece.lettering ? 'lettering' : piece.icon ?? 'breath'),
+    ...orbits.bubbleBodies.map(() => 'bubble'),
+  ] as ReactionKind[])
+  const heartMaterials: THREE.MeshPhysicalMaterial[] = []
+  const music = createMusicAudio(state => {
+    musicState = state
+    onMusic(state)
+    if (import.meta.env.DEV) {
+      host.dataset.musicMood = state.mood ?? ''
+      host.dataset.musicPlaying = String(state.playing)
+      host.dataset.musicAudible = String(state.audible)
+    }
+  })
   const finishes: Record<Finish, THREE.MeshPhysicalMaterial> = {
     ink: new THREE.MeshPhysicalMaterial({ color: '#101421', roughness: .32, metalness: .08, clearcoat: .32, clearcoatRoughness: .32, envMapIntensity: .9 }),
     coral: new THREE.MeshPhysicalMaterial({ color: '#f18f86', roughness: .28, metalness: 0, clearcoat: .62, clearcoatRoughness: .25, envMapIntensity: .9 }),
@@ -114,6 +135,14 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     material.dithering = true
     if (name !== 'glass') contactLighting.apply(material)
   })
+  const musicVisuals = createMusicVisuals(scene, studio.background)
+  const selectMusic = (index: number) => {
+    if (selectedMusic === index) { music.toggle(); return }
+    selectedMusic = index
+    const mood = index < COUNT ? pieces[index].finish : 'bubble'
+    musicVisuals.select(mood)
+    music.select(mood)
+  }
   // Transparent render queue excludes symbols from the glass refraction buffer.
   const glyphDark = new THREE.MeshPhysicalMaterial({ color: '#192034', metalness: .2, roughness: .33, clearcoat: .22, dithering: true, transparent: true })
   const glyphLight = new THREE.MeshPhysicalMaterial({ color: '#fff0f5', metalness: .08, roughness: .25, clearcoat: .45, dithering: true, transparent: true })
@@ -122,7 +151,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const letterCanvas = document.createElement('canvas')
   letterCanvas.width = letterCanvas.height = 512
   const letterContext = letterCanvas.getContext('2d')!
-  letterContext.fillStyle = '#e0c9f0'
+  letterContext.fillStyle = '#ffffff'
   letterContext.textAlign = 'center'
   letterContext.font = '500 43px Arial, sans-serif'
   letterContext.letterSpacing = '5px'
@@ -130,7 +159,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const letterTexture = new THREE.CanvasTexture(letterCanvas)
   letterTexture.colorSpace = THREE.SRGBColorSpace
   letterTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
-  const letterMaterial = new THREE.MeshBasicMaterial({ map: letterTexture, transparent: true, depthWrite: false, toneMapped: false })
+  const letterMaterial = new THREE.MeshBasicMaterial({ color: '#e0c9f0', map: letterTexture, transparent: true, depthWrite: false, toneMapped: false })
   const icons = createMusicIcons()
   // Evenly tessellated superellipsoids have continuous curvature across the face,
   // not just beveled corners. Analytic normals keep moving highlights smooth.
@@ -220,7 +249,9 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     const geometry = (piece.r < .5 && !piece.form ? smallTile : prototypes[piece.form ?? 'tile']).clone()
     geometry.setAttribute('shapeIndex', new THREE.BufferAttribute(new Float32Array(geometry.getAttribute('position').count).fill(index), 1))
     geometries.push(geometry)
-    const mesh = new THREE.Mesh(geometry, finishes[piece.finish])
+    const bodyMaterial = piece.icon === 'heart' ? finishes[piece.finish].clone() : finishes[piece.finish]
+    if (piece.icon === 'heart') { contactLighting.apply(bodyMaterial); heartMaterials.push(bodyMaterial) }
+    const mesh = new THREE.Mesh(geometry, bodyMaterial)
     mesh.userData.bodyIndex = index
     object.add(mesh)
     interactiveMeshes.push(mesh)
@@ -231,6 +262,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       glyph.scale.setScalar(index === 0 ? 1.06 : .84)
       glyph.position.z = geometry.boundingBox!.max.z + .024
       object.add(glyph)
+      reactions.register(index, glyph, piece.icon === 'heart' ? bodyMaterial : undefined)
     }
     if (piece.lettering) {
       const letterGeometry = new THREE.PlaneGeometry(1.1, 1.1)
@@ -238,6 +270,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       const lettering = new THREE.Mesh(letterGeometry, letterMaterial)
       lettering.position.z = geometry.boundingBox!.max.z + .012
       object.add(lettering)
+      reactions.register(index, lettering)
     }
   }
 
@@ -289,7 +322,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     cluster.worldToLocal(offset)
     body.position.copy(offset)
     if (index < COUNT) body.rotation.copy(bodies[index].rest)
-  })
+  }, index => reactions.scale(index))
   const renderBodyRadiusAt = (index: number) => lifecycle.scale(index, renderAlpha)
   const bubbleRadiusAt = (index: number) => lifecycle.scale(COUNT + index, renderAlpha)
   let renderAlpha = 1
@@ -404,7 +437,9 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const reset = () => {
     dragging = -1
     canPuff = false; feedbackIndex = -1
+    reactions.reset()
     lifecycle.reset(); burstEffects.reset(); burstAudio.stop()
+    selectedMusic = -1; music.reset(); musicVisuals.reset()
     entrance.replay()
     interactiveBodies.forEach(body => { body.enabled = false })
     wireReveal = 0; orbits.reveal(0)
@@ -434,6 +469,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     const { width, height } = host.getBoundingClientRect()
     if (!width || !height) return
     const aspect = width / height
+    musicVisuals.resize(aspect)
     mobile = width < 768
     const viewHeight = mobile ? Math.max(8.2, 8.8 / aspect) : Math.max(8.2, 13.8 / aspect)
     camera.left = -viewHeight * aspect / 2
@@ -480,7 +516,6 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const onDown = (event: PointerEvent) => {
     if (event.button !== 0 || pointerId !== null) return
     projectPointer(event)
-    if (paused) return
     burstAudio.unlock()
     raycaster.setFromCamera(pointer, camera)
     const hit = raycaster.intersectObjects(interactiveMeshes, false).find(candidate => {
@@ -505,7 +540,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     if (event.pointerId !== pointerId) return
     const clicked = dragging
     const isClick = canPuff && clicked >= 0 && performance.now() - pressTime < 450 && pressOrigin.distanceTo(new THREE.Vector2(event.clientX, event.clientY)) <= 9
-    if (isClick && lifecycle.puff(clicked)) {
+    if (isClick) selectMusic(clicked)
+    if (isClick && !paused && lifecycle.puff(clicked)) {
       feedbackIndex = clicked; feedbackTime = performance.now()
       // A click injects air without nudging the shape away from the next click.
       active = false
@@ -530,7 +566,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     cursor.classList.remove('visible', 'is-dragging', 'is-charging')
     cursor.style.setProperty('--charge', '0')
   }
-  const onVisibility = () => { previousTime = 0; accumulator = 0; if (document.hidden) { onCancel(); burstAudio.stop() } }
+  const onVisibility = () => { music.setHidden(document.hidden); previousTime = 0; accumulator = 0; if (document.hidden) { onCancel(); burstAudio.stop() } }
   const onLostCapture = (event: PointerEvent) => { if (event.pointerId === pointerId) onCancel() }
   const onContextLost = (event: Event) => { event.preventDefault(); onError() }
   host.addEventListener('pointermove', onMove)
@@ -638,6 +674,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         frameCount = 0; sampleTime = now
       }
     }
+    const sound = music.sample()
+    if (reactions.update(dt, selectedMusic, musicState.audible, sound, paused)) needsRender = true
     entrance.step(dt, launch)
     if (wireReady && entrance.entered > 0 && wireReveal < 1) {
       wireReveal = paused ? 1 : Math.min(1, wireReveal + dt * .9)
@@ -682,7 +720,20 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       }
       needsRender = true
     }
+    if (musicVisuals.update(dt, sound.energy, paused || !musicState.audible)) needsRender = true
+    host.parentElement?.style.setProperty('--music-energy', sound.energy.toFixed(3))
+    if (import.meta.env.DEV) {
+      host.dataset.musicEnergy = sound.energy.toFixed(4)
+      host.dataset.musicContext = music.contextState
+      host.dataset.musicVoices = String(music.voices)
+      host.dataset.musicNotes = String(music.scheduledNotes)
+      host.dataset.musicSelected = String(selectedMusic)
+      host.dataset.musicReaction = reactions.kind(selectedMusic)
+      host.dataset.reactionActivity = reactions.activity(selectedMusic).toFixed(3)
+      host.dataset.reactionScale = reactions.scale(selectedMusic).toFixed(4)
+    }
     if (needsRender) {
+      musicVisuals.paint(renderer)
       renderer.render(scene, camera)
       needsRender = false
     }
@@ -703,13 +754,15 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     Object.values(finishes).forEach(material => material.dispose())
     glyphDark.dispose(); glyphLight.dispose(); glyphLilac.dispose(); glyphPrism.dispose()
     letterMaterial.dispose(); letterTexture.dispose(); orbits.dispose(); studio.dispose()
-    contactLighting.dispose()
+    contactLighting.dispose(); musicVisuals.dispose(); reactions.dispose()
+    heartMaterials.forEach(material => material.dispose())
     burstEffects.dispose(); burstAudio.dispose()
     renderer.dispose()
   }
 
   return {
     reset, scatter,
+    toggleMusic() { if (selectedMusic < 0) selectMusic(0); else music.toggle() },
     setPaused(value) {
       paused = value; accumulator = 0; needsRender = true
       if (value) {
@@ -724,10 +777,11 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         settleFrames = 24
       }
     },
-    setSoundEnabled(value) { burstAudio.setMuted(!value) },
+    setSoundEnabled(value) { burstAudio.setMuted(!value); music.setMuted(!value) },
     dispose() {
       if (disposed) return
       disposed = true
+      music.dispose()
       burstAudio.stop()
       cancelAnimationFrame(raf)
       resizeObserver.disconnect()

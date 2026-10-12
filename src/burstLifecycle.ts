@@ -11,7 +11,7 @@ export const FINAL_PUFF_SECONDS = .18
 const REPLACE_DELAY = .26
 
 /** Reuse each ornament's body and GPU assets for its matching replacement. */
-export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (index: number, body: BurstBody) => void, spawn: (index: number, body: BurstBody, generation: number) => void) {
+export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (index: number, body: BurstBody) => void, spawn: (index: number, body: BurstBody, generation: number) => void, reactionScale: (index: number) => number = () => 1) {
   const states = bodies.map(body => ({
     radius: body.radius, halfSize: body.halfSize.clone(), mass: body.mass,
     phase: 'live' as 'live' | 'gone' | 'arriving', age: 0, charge: 0, puffs: 0, puffAge: 10, scale: 1, previousScale: 1, generation: 0,
@@ -28,8 +28,9 @@ export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (ind
   const size = (index: number, scale: number) => {
     const state = states[index], body = bodies[index]
     state.scale = scale
-    body.radius = state.radius * scale
-    body.halfSize.copy(state.halfSize).multiplyScalar(scale)
+    const physicalScale = scale * reactionScale(index)
+    body.radius = state.radius * physicalScale
+    body.halfSize.copy(state.halfSize).multiplyScalar(physicalScale)
     // Inflation changes volume, not the amount of material in the ornament.
     body.mass = state.mass
   }
@@ -51,6 +52,7 @@ export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (ind
         return
       }
       if (state.phase === 'arriving') {
+        size(index, 1)
         state.age += dt
         if (state.age > 2.5 && body.position.distanceTo(body.home) < body.radius + .8) state.phase = 'live'
         return
@@ -79,7 +81,7 @@ export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (ind
   return {
     states, step, puff, reset,
     canGrab: (index: number) => index >= 0 && states[index]?.phase === 'live' && states[index].puffs < PUFFS_TO_POP,
-    scale: (index: number, alpha = 1) => states[index].radius * THREE.MathUtils.lerp(states[index].previousScale, states[index].scale, alpha),
+    scale: (index: number, alpha = 1) => states[index].radius * THREE.MathUtils.lerp(states[index].previousScale, states[index].scale, alpha) * reactionScale(index),
     get pops() { return pops },
   }
 }

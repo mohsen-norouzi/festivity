@@ -1,7 +1,7 @@
-import waveIcon from './assets/icons/waveform.svg'
 import noteIcon from './assets/icons/music-notes-fill.svg'
 import heartIcon from './assets/icons/heart-fill.svg'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { MUSIC_MOODS, type MusicState } from './musicMoods'
 import type { OrnamentScene } from './scene'
 
 function PauseIcon({ paused }: { paused: boolean }) {
@@ -35,6 +35,8 @@ export default function App() {
   const [fullscreen, setFullscreen] = useState(false)
   const [resetCount, setResetCount] = useState(0)
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const [music, setMusic] = useState<MusicState>({ mood: null, playing: false, audible: false })
+  const song = music.mood ? MUSIC_MOODS[music.mood] : null
 
   const preferences = useRef({ paused, soundEnabled })
   preferences.current = { paused, soundEnabled }
@@ -51,7 +53,8 @@ export default function App() {
           if (cancelled || !host.current || !cursor.current) return
           instance = createOrnamentScene(host.current, cursor.current,
             () => { if (!cancelled) setReady(true) },
-            () => { if (!cancelled) setError(true) })
+            () => { if (!cancelled) setError(true) },
+            state => { if (!cancelled) setMusic(state) })
           scene.current = instance
           instance.setPaused(preferences.current.paused)
           if (!preferences.current.soundEnabled) instance.setSoundEnabled(false)
@@ -119,8 +122,8 @@ export default function App() {
   }
 
   return (
-    <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''}`}>
-      <div ref={host} className="scene absolute inset-0" role="img" aria-label="An interactive sculpture of glass bubbles and music tiles. Drag to move. Click a shape repeatedly to inflate and pop it; a matching replacement floats in." />
+    <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''} ${music.audible ? 'is-music-playing' : ''} ${song ? 'has-music' : ''}`} style={{ '--mood-accent': song?.accent ?? '#e5c4ff' } as CSSProperties}>
+      <div ref={host} className="scene absolute inset-0" role="img" aria-label="An interactive sculpture of glass bubbles and music tiles. Click a shape to toggle its music and symbol animation. Every click also inflates it; five clicks pop it. Drag to move; a matching replacement floats in." />
       <div className="grain pointer-events-none absolute inset-0" aria-hidden="true" />
       <div ref={cursor} className="scene-cursor pointer-events-none" aria-hidden="true"><span /></div>
 
@@ -139,7 +142,7 @@ export default function App() {
         <button onClick={() => setPaused(value => !value)}><span>{paused ? 'Resume motion' : 'Pause motion'}</span><PauseIcon paused={paused} /></button>
         <button onClick={reset}><span>Reset composition</span><ResetIcon /></button>
         <button onClick={scatter}><span>Scatter shapes</span><span aria-hidden="true">↗</span></button>
-        <p className="menu-hint">Click repeatedly to inflate and pop. Drag to move.<br />A new shape floats in to take its place.</p>
+        <p className="menu-hint">Click to toggle a shape’s music and animation.<br />Every click adds air. Five clicks pop it. Drag to move.</p>
       </div>}
 
       <div className="study-caption absolute z-10 pointer-events-none">
@@ -149,8 +152,8 @@ export default function App() {
       </div>
 
       <div className="interaction-label absolute z-10 pointer-events-none">
-        <p className="desktop-hint">DRAG TO MOVE · CLICK TO INFLATE</p>
-        <p className="touch-hint">DRAG TO MOVE · TAP TO INFLATE</p>
+        <p className="desktop-hint">CLICK TO LISTEN · DRAG TO MOVE</p>
+        <p className="touch-hint">TAP TO LISTEN · DRAG TO MOVE</p>
         <span className={paused ? 'status-dot is-paused' : 'status-dot'} />
       </div>
 
@@ -158,10 +161,14 @@ export default function App() {
         <div className="avatar-pair" aria-hidden="true"><span><img src={noteIcon} alt="" /></span><span><img src={heartIcon} alt="" /></span></div>
         <p><strong>Artists × fans</strong><span>Closer through music</span></p>
       </div>
-      <button className="floating-card explore-card" onClick={scatter} aria-label="Remix the composition">
-        <img className="card-wave" src={waveIcon} alt="" />
-        <p><strong>Explore the sound</strong><span>Remix the composition</span></p>
-        <span className="card-action" aria-hidden="true">↗</span>
+      <button className="floating-card explore-card music-player" onClick={() => scene.current?.toggleMusic()} aria-label={music.playing ? 'Pause music' : 'Play music'} aria-pressed={music.playing}>
+        <span className="music-meter" aria-hidden="true"><i /><i /><i /><i /><i /></span>
+        <span className="music-copy">
+          <span className="music-eyebrow">{song ? music.playing ? music.audible ? 'NOW PLAYING' : 'SOUND OFF' : 'PAUSED' : 'FIND YOUR FREQUENCY'}</span>
+          <strong>{song?.name ?? 'Explore the sound'}</strong>
+          <span className="music-subtitle">{song ? `${song.genre} · ${song.bpm} BPM` : 'Click a shape to toggle'}</span>
+        </span>
+        <span className="card-action" aria-hidden="true"><PauseIcon paused={!music.playing} /></span>
       </button>
       <div className="floating-card together-card">
         <span className="connection-mark" aria-hidden="true"><i /><i /><i /></span>
@@ -177,7 +184,7 @@ export default function App() {
         <h1 className="hero-title">MUSIC, IN MOTION</h1>
         <div className="simulation-controls flex items-center">
           <span className="simulation-label">{paused ? 'MOTION PAUSED' : 'LIVE SIMULATION'}</span>
-          <button className="icon-button" onClick={toggleSound} aria-label={soundEnabled ? 'Mute burst sounds' : 'Enable burst sounds'} aria-pressed={soundEnabled} title={soundEnabled ? 'Mute burst sounds' : 'Enable burst sounds'}><SoundIcon enabled={soundEnabled} /></button>
+          <button className="icon-button" onClick={toggleSound} aria-label={soundEnabled ? 'Mute all audio' : 'Enable audio'} aria-pressed={soundEnabled} title={soundEnabled ? 'Mute all audio' : 'Enable audio'}><SoundIcon enabled={soundEnabled} /></button>
           <button className="icon-button" onClick={() => setPaused(value => !value)} aria-label={paused ? 'Resume motion' : 'Pause motion'} title={paused ? 'Resume motion' : 'Pause motion'}><PauseIcon paused={paused} /></button>
           <button className="icon-button" onClick={reset} aria-label="Reset composition" title="Reset composition"><ResetIcon /></button>
           {document.fullscreenEnabled && <button className="icon-button fullscreen-button" onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}><ExpandIcon /></button>}
