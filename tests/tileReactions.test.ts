@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import * as THREE from 'three'
 import { createTileReactions, heartbeat } from '../src/tileReactions'
-import { createBurstLifecycle } from '../src/burstLifecycle'
+import { createBurstLifecycle, INFLATION_SECONDS } from '../src/burstLifecycle'
 
 const sound = { time: .4, phase: .09, energy: .6 }
 function settle(reactions: ReturnType<typeof createTileReactions>, selected: number, playing: boolean, paused = false) {
@@ -79,14 +79,13 @@ describe('per-shape music reactions', () => {
     expect(body.radius).toBeCloseTo(1.04, 6)
     expect(body.halfSize.x).toBeCloseTo(.8 * 1.04, 6)
     expect(life.scale(0)).toBeCloseTo(body.radius, 8)
-    life.puff(0)
-    for (let i = 0; i < 45; i++) life.step(1 / 90)
+    life.start(0)
+    for (let i = 0; i < 90; i++) life.step(1 / 90)
     expect(body.radius).toBeGreaterThan(1.15)
     expect(life.scale(0)).toBeCloseTo(body.radius, 8)
     pulse = 1; life.step(1 / 90)
     expect(body.halfSize.x / body.radius).toBeCloseTo(.8, 8)
-    for (let i = 0; i < 4; i++) life.puff(0)
-    for (let i = 0; i < 20; i++) life.step(1 / 90)
+    for (let i = 0; i < Math.ceil((INFLATION_SECONDS - 1) * 90); i++) life.step(1 / 90)
     expect(pops).toBe(1)
   })
 })

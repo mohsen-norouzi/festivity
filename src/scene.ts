@@ -138,7 +138,6 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   })
   const musicVisuals = createMusicVisuals(scene, studio.background)
   const selectMusic = (index: number) => {
-    if (selectedMusic === index) { music.toggle(); return }
     selectedMusic = index
     const mood = index < COUNT ? pieces[index].finish : 'bubble'
     musicVisuals.select(mood)
@@ -220,8 +219,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const cursorPosition = new THREE.Vector2(-100, -100)
   const cursorTarget = new THREE.Vector2(-100, -100)
   const pressOrigin = new THREE.Vector2()
-  let canPuff = false
-  let pressTime = 0, feedbackIndex = -1, feedbackTime = 0
+  let canClick = false
+  let pressTime = 0, feedbackIndex = -1
   let active = false
   let dragging = -1
   let pointerId: number | null = null
@@ -323,9 +322,15 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       const distance = delta.length()
       if (distance > .001 && distance < reach) orbits.ribbon.physics.velocities[i].addScaledVector(delta, (1 - distance / reach) * 1.3 / distance)
     })
-    dragging = -1; canPuff = false
-    cursor.classList.remove('is-dragging', 'is-charging')
-    cursor.style.setProperty('--charge', '0')
+    // A different body can burst while the pointer is dragging this one.
+    if (dragging === index) {
+      dragging = -1; canClick = false
+      cursor.classList.remove('is-dragging')
+    }
+    if (feedbackIndex === index) {
+      cursor.classList.remove('is-charging')
+      cursor.style.setProperty('--charge', '0')
+    }
     if (import.meta.env.DEV) host.dataset.lastBurst = String(index)
   }, (index, body, generation) => {
     // Start fully outside the current viewport, at the ornament's natural side.
@@ -357,7 +362,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       v.y += ((body.home.y - p.y) * 3.8 + float) * dt
       v.z += (body.home.z - p.z) * 4.2 * dt
 
-      if (!settling && i === dragging && !canPuff) {
+      if (!settling && i === dragging && !canClick) {
         v.x += (pointerWorld.x - p.x) * 70 * dt
         v.y += (pointerWorld.y - p.y) * 70 * dt
         v.z += (dragDepth - p.z) * 70 * dt
@@ -426,7 +431,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       }
     }
     bubbleInteraction.hover = active && dragging < 0
-    bubbleInteraction.dragging = dragging >= COUNT && !canPuff ? dragging - COUNT : -1
+    bubbleInteraction.dragging = dragging >= COUNT && !canClick ? dragging - COUNT : -1
     orbits.step(dt, bodies, elapsed, settling, bubbleInteraction)
     if (!settling) burstEffects.step(dt, interactiveBodies)
   }
@@ -450,7 +455,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
 
   const reset = () => {
     dragging = -1
-    canPuff = false; feedbackIndex = -1
+    canClick = false; feedbackIndex = -1
     reactions.reset()
     lifecycle.reset(); burstEffects.reset(); burstAudio.stop()
     selectedMusic = -1; music.reset(); musicVisuals.reset()
@@ -526,7 +531,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
 
   const onMove = (event: PointerEvent) => {
     projectPointer(event)
-    if (pointerId !== null && pressOrigin.distanceTo(cursorTarget) > 9) canPuff = false
+    if (pointerId !== null && pressOrigin.distanceTo(cursorTarget) > 9) canClick = false
   }
   const onDown = (event: PointerEvent) => {
     if (event.button !== 0 || pointerId !== null) return
@@ -538,13 +543,13 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       const finish = index < COUNT ? pieces[index].finish : 'bubble'
       return entrance.hasEntered(index) && interactiveBodies[index].enabled !== false && warmedFinishes.has(finish) && lifecycle.canGrab(index)
     })
-    dragging = -1; canPuff = false
+    dragging = -1; canClick = false
     if (hit) {
       dragging = hit.object === orbits.bubbleMesh ? COUNT + hit.instanceId! : hit.object.userData.bodyIndex as number
       dragDepth = interactiveBodies[dragging].position.z + .2
       projectPointer(event)
       pressOrigin.copy(cursorTarget)
-      canPuff = true
+      canClick = true
       pressTime = performance.now()
     }
     pointerId = event.pointerId
@@ -554,18 +559,18 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const onUp = (event: PointerEvent) => {
     if (event.pointerId !== pointerId) return
     const clicked = dragging
-    const isClick = canPuff && clicked >= 0 && performance.now() - pressTime < 450 && pressOrigin.distanceTo(new THREE.Vector2(event.clientX, event.clientY)) <= 9
+    const isClick = canClick && clicked >= 0 && performance.now() - pressTime < 450 && pressOrigin.distanceTo(new THREE.Vector2(event.clientX, event.clientY)) <= 9
     if (isClick) selectMusic(clicked)
-    if (isClick && !paused && lifecycle.puff(clicked)) {
-      feedbackIndex = clicked; feedbackTime = performance.now()
-      // A click injects air without nudging the shape away from the next click.
-      active = false
+    if (isClick && !paused) {
+      // Starting an already inflating shape is a no-op; its song keeps playing.
+      lifecycle.start(clicked)
+      feedbackIndex = clicked
     }
     const releasedPointer = pointerId
     pointerId = null
     if (host.hasPointerCapture(releasedPointer)) host.releasePointerCapture(releasedPointer)
     dragging = -1
-    canPuff = false
+    canClick = false
     cursor.classList.remove('is-dragging', 'is-charging')
     cursor.style.setProperty('--charge', '0')
     active = false
@@ -577,7 +582,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   }
   const onCancel = () => {
     dragging = -1; pointerId = null; active = false
-    canPuff = false
+    canClick = false
     cursor.classList.remove('visible', 'is-dragging', 'is-charging')
     cursor.style.setProperty('--charge', '0')
   }
@@ -691,7 +696,6 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         host.dataset.triangles = String(renderer.info.render.triangles)
         host.dataset.wireContacts = String(orbits.wire.contacts)
         host.dataset.ribbonContacts = String(orbits.ribbon.physics.contacts)
-        host.dataset.bursts = String(lifecycle.pops)
         host.dataset.soundPlays = String(burstAudio.plays)
         host.dataset.lastSound = burstAudio.lastSound
         frameCount = 0; sampleTime = now
@@ -735,14 +739,17 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       updateInstances(accumulator / STEP)
       burstEffects.render(interactiveBodies, renderAlpha, renderBodyRadiusAt)
       const charge = feedbackIndex >= 0 ? lifecycle.states[feedbackIndex].charge : 0
-      cursor.classList.toggle('is-charging', charge > 0 && now - feedbackTime < 1800)
+      cursor.classList.toggle('is-charging', charge > 0)
       cursor.style.setProperty('--charge', String(charge))
       if (import.meta.env.DEV) {
         host.dataset.wetDrops = String(burstEffects.surfaceDrops)
         host.dataset.oilStrands = String(burstEffects.oilStrands)
         host.dataset.liquidDrops = String(burstEffects.activeFragments)
         host.dataset.charging = String(feedbackIndex)
-        host.dataset.puffs = String(feedbackIndex >= 0 ? lifecycle.states[feedbackIndex].puffs : 0)
+        host.dataset.bursts = String(lifecycle.pops)
+        host.dataset.inflating = String(lifecycle.states.filter(state => state.phase === 'inflating').length)
+        host.dataset.inflationPhase = feedbackIndex >= 0 ? lifecycle.states[feedbackIndex].phase : 'idle'
+        host.dataset.inflationScale = feedbackIndex >= 0 ? lifecycle.states[feedbackIndex].scale.toFixed(3) : '1'
         host.dataset.charge = charge.toFixed(2)
         host.dataset.replacements = String(lifecycle.states.filter(state => state.phase === 'arriving').length)
       }

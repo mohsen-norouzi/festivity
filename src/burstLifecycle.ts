@@ -6,23 +6,21 @@ export interface BurstBody extends WireBody {
   previous: THREE.Vector3
 }
 
-export const PUFFS_TO_POP = 5
-export const FINAL_PUFF_SECONDS = .18
+export const INFLATION_SECONDS = 2.6
 const REPLACE_DELAY = .26
 
 /** Reuse each ornament's body and GPU assets for its matching replacement. */
 export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (index: number, body: BurstBody) => void, spawn: (index: number, body: BurstBody, generation: number) => void, reactionScale: (index: number) => number = () => 1) {
   const states = bodies.map(body => ({
     radius: body.radius, halfSize: body.halfSize.clone(), mass: body.mass,
-    phase: 'live' as 'live' | 'gone' | 'arriving', age: 0, charge: 0, puffs: 0, puffAge: 10, scale: 1, previousScale: 1, generation: 0,
+    phase: 'live' as 'live' | 'inflating' | 'gone' | 'arriving', age: 0, charge: 0, scale: 1, previousScale: 1, generation: 0,
   }))
   let pops = 0
-  const puff = (index: number) => {
+  const start = (index: number) => {
     const state = states[index]
-    if (!state || state.phase !== 'live' || state.puffs >= PUFFS_TO_POP) return false
-    state.puffs++
-    state.charge = state.puffs / PUFFS_TO_POP
-    state.puffAge = 0
+    if (!state || state.phase !== 'live' || bodies[index].enabled === false) return false
+    state.phase = 'inflating'
+    state.age = state.charge = 0
     return true
   }
   const size = (index: number, scale: number) => {
@@ -38,11 +36,10 @@ export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (ind
     states.forEach((state, index) => {
       const body = bodies[index]
       state.previousScale = state.scale
-      state.puffAge += dt
       if (state.phase === 'gone') {
         state.age += dt
         if (state.age >= REPLACE_DELAY) {
-          state.phase = 'arriving'; state.age = 0; state.puffs = 0; state.charge = 0; state.puffAge = 10
+          state.phase = 'arriving'; state.age = state.charge = 0
           size(index, 1); state.previousScale = 1
           spawn(index, body, ++state.generation)
           body.previous.copy(body.position)
@@ -57,11 +54,15 @@ export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (ind
         if (state.age > 2.5 && body.position.distanceTo(body.home) < body.radius + .8) state.phase = 'live'
         return
       }
-      // Each discrete click adds air. A soft overshoot makes the puff tangible.
-      const pulse = Math.sin(state.puffAge * 24) * Math.exp(-state.puffAge * 10) * .06
-      const goal = 1 + state.charge * (body.isSphere ? 1.7 : .58) + pulse
-      size(index, THREE.MathUtils.damp(state.scale, goal, 24, dt))
-      if (state.puffs === PUFFS_TO_POP && state.puffAge >= FINAL_PUFF_SECONDS) {
+      // One click opens the air valve. Each body owns its countdown, independent
+      // of the currently selected song or any later clicks on other ornaments.
+      if (state.phase === 'inflating') {
+        state.age += dt
+        state.charge = Math.min(1, state.age / INFLATION_SECONDS)
+      }
+      const goal = 1 + state.charge * (body.isSphere ? 1.7 : .58)
+      size(index, THREE.MathUtils.damp(state.scale, goal, 18, dt))
+      if (state.phase === 'inflating' && state.age >= INFLATION_SECONDS) {
         onBurst(index, body)
         pops++
         state.phase = 'gone'; state.age = 0; state.charge = 0
@@ -74,13 +75,12 @@ export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (ind
     pops = 0
     states.forEach((state, index) => {
       state.phase = 'live'; state.age = state.charge = state.generation = 0
-      state.puffs = 0; state.puffAge = 10
       size(index, 1); state.previousScale = 1; bodies[index].enabled = true
     })
   }
   return {
-    states, step, puff, reset,
-    canGrab: (index: number) => index >= 0 && states[index]?.phase === 'live' && states[index].puffs < PUFFS_TO_POP,
+    states, step, start, reset,
+    canGrab: (index: number) => bodies[index]?.enabled !== false && (states[index]?.phase === 'live' || states[index]?.phase === 'inflating'),
     scale: (index: number, alpha = 1) => states[index].radius * THREE.MathUtils.lerp(states[index].previousScale, states[index].scale, alpha) * reactionScale(index),
     get pops() { return pops },
   }

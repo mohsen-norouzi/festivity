@@ -109,7 +109,7 @@ export default function App() {
 
   return (
     <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''} ${music.audible ? 'is-music-playing' : ''} ${song ? 'has-music' : ''}`} style={{ '--mood-accent': song?.accent ?? '#e5c4ff' } as CSSProperties}>
-      <div ref={host} className="scene absolute inset-0" role="img" aria-label="An interactive sculpture of glass bubbles and music tiles. Click a shape to toggle its music and symbol animation. Every click also inflates it; five clicks pop it. Drag to move; a matching replacement floats in." />
+      <div ref={host} className="scene absolute inset-0" role="img" aria-label="An interactive sculpture of glass bubbles and music tiles. Click a shape once to play its music and inflate it until it pops. Repeated clicks keep the music playing; another shape selects its track. Drag to move; a matching replacement floats in." />
       <div className="grain pointer-events-none absolute inset-0" aria-hidden="true" />
       <div ref={cursor} className="scene-cursor pointer-events-none" aria-hidden="true"><span /></div>
 

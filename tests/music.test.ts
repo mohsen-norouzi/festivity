@@ -51,7 +51,7 @@ describe('local song playback', () => {
     expect(MUSIC_MOODS.glass.artist).toBe('Johny Grimes')
   })
 
-  test('loads nothing before interaction; same-material selections never restart playback', async () => {
+  test('loads nothing before interaction; repeated selections never pause or restart playback', async () => {
     const h = harness()
     try {
       h.audio.setMuted(false)
@@ -63,6 +63,7 @@ describe('local song playback', () => {
       h.players[0].currentTime = 24
       for (let i = 0; i < 20; i++) h.audio.select('coral')
       expect(h.players.length).toBe(1); expect(h.players[0].plays).toBe(1); expect(h.audio.time).toBe(24)
+      expect(h.state.playing).toBe(true); expect(h.state.audible).toBe(true)
       h.ctx.currentTime = .1
       expect(h.audio.sample().energy).toBeGreaterThan(0)
       expect(h.audio.sample().time).toBe(24)
