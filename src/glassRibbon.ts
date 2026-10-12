@@ -111,7 +111,10 @@ export function createRibbonGeometry(nodes: THREE.Vector3[]) {
   return { glass, lettering, edges, update, dispose() { glass.dispose(); lettering.dispose(); edges.dispose() } }
 }
 
-function inscription(anisotropy: number) {
+async function inscription(anisotropy: number) {
+  const logo = new Image()
+  logo.src = '/brand/musync-symbol-white.svg'
+  await logo.decode()
   const canvas = document.createElement('canvas')
   canvas.width = 1536; canvas.height = 128
   const ctx = canvas.getContext('2d')!
@@ -121,13 +124,11 @@ function inscription(anisotropy: number) {
   ctx.textAlign = 'center'
   ctx.letterSpacing = '2px'
   ctx.fillText('MUSIC MOVES PEOPLE', 663, 67)
-  ctx.lineCap = 'round'
-  ctx.lineWidth = 9
-  ctx.strokeStyle = '#fff8ff'
-  ;[22, 43, 66, 88, 52, 31].forEach((height, i) => {
-    const x = 1360 + i * 18
-    ctx.beginPath(); ctx.moveTo(x, 64 - height / 2); ctx.lineTo(x, 64 + height / 2); ctx.stroke()
-  })
+  // Keep the original inscription layout; only the separator changes to the
+  // official MUSYNC symbol, baked into the existing texture without a wordmark.
+  const logoHeight = 88
+  const logoWidth = logoHeight * 96 / 109
+  ctx.drawImage(logo, 1405 - logoWidth / 2, (canvas.height - logoHeight) / 2, logoWidth, logoHeight)
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.wrapS = THREE.RepeatWrapping
@@ -198,9 +199,9 @@ export function createGlassRibbon(parent: THREE.Group, anisotropy: number) {
   }
   return {
     group, physics,
-    prepare() {
+    async prepare() {
       if (texture) return
-      texture = inscription(anisotropy)
+      texture = await inscription(anisotropy)
       textMaterial.map = texture
       textMaterial.needsUpdate = true
     },

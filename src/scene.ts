@@ -636,7 +636,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     }
     // Prepare the extra glass only after the ornaments can already fly in.
     if (!await nextFrame()) return
-    orbits.ribbon.prepare()
+    await orbits.ribbon.prepare()
+    if (disposed) return
     await renderer.compileAsync(orbits.ribbon.group, camera, scene)
     if (disposed) return
     ribbonReady = true
