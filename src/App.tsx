@@ -19,6 +19,10 @@ function ExpandIcon() {
   return <svg viewBox="0 0 20 20"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4" /></svg>
 }
 
+function SoundIcon({ enabled }: { enabled: boolean }) {
+  return <svg viewBox="0 0 20 20"><path d="M9 4 5 7H2v6h3l4 3Z" />{enabled ? <path d="M12 6a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /> : <path d="m13 7 5 6m0-6-5 6" />}</svg>
+}
+
 export default function App() {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<OrnamentScene | null>(null)
@@ -31,6 +35,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [resetCount, setResetCount] = useState(0)
+  const [soundEnabled, setSoundEnabled] = useState(true)
 
   useEffect(() => {
     if (!host.current || !cursor.current) return
@@ -79,6 +84,11 @@ export default function App() {
     scene.current?.scatter()
   }
 
+  const toggleSound = () => {
+    scene.current?.setSoundEnabled(!soundEnabled)
+    setSoundEnabled(value => !value)
+  }
+
   const toggleFullscreen = async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen()
@@ -88,7 +98,7 @@ export default function App() {
 
   return (
     <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''}`}>
-      <div ref={host} className="scene absolute inset-0" role="img" aria-label="A floating sculpture of glass, ceramic, and satin music tiles in coral, lilac, pearl, and midnight blue. Move through the shapes or drag one to explore." />
+      <div ref={host} className="scene absolute inset-0" role="img" aria-label="An interactive sculpture of glass bubbles and music tiles. Drag to move. Click and hold a shape to inflate and pop it; a matching replacement floats in." />
       <div className="grain pointer-events-none absolute inset-0" aria-hidden="true" />
       <div ref={cursor} className="scene-cursor pointer-events-none" aria-hidden="true"><span /></div>
 
@@ -107,7 +117,7 @@ export default function App() {
         <button onClick={() => setPaused(value => !value)}><span>{paused ? 'Resume motion' : 'Pause motion'}</span><PauseIcon paused={paused} /></button>
         <button onClick={reset}><span>Reset composition</span><ResetIcon /></button>
         <button onClick={scatter}><span>Scatter shapes</span><span aria-hidden="true">↗</span></button>
-        <p className="menu-hint">Move to push. Hold to pull.<br />Let go and watch it settle.</p>
+        <p className="menu-hint">Drag to move. Hold still to pop.<br />A new shape floats in to take its place.</p>
       </div>}
 
       <div className="study-caption absolute z-10 pointer-events-none">
@@ -117,8 +127,8 @@ export default function App() {
       </div>
 
       <div className="interaction-label absolute z-10 pointer-events-none">
-        <p className="desktop-hint">DRAG CURSOR TO INTERACT</p>
-        <p className="touch-hint">TOUCH &amp; DRAG TO INTERACT</p>
+        <p className="desktop-hint">DRAG TO MOVE · HOLD TO POP</p>
+        <p className="touch-hint">DRAG TO MOVE · HOLD TO POP</p>
         <span className={paused ? 'status-dot is-paused' : 'status-dot'} />
       </div>
 
@@ -145,6 +155,7 @@ export default function App() {
         <h1 className="hero-title">MUSIC, IN MOTION</h1>
         <div className="simulation-controls flex items-center">
           <span className="simulation-label">{paused ? 'MOTION PAUSED' : 'LIVE SIMULATION'}</span>
+          <button className="icon-button" onClick={toggleSound} aria-label={soundEnabled ? 'Mute burst sounds' : 'Enable burst sounds'} aria-pressed={soundEnabled} title={soundEnabled ? 'Mute burst sounds' : 'Enable burst sounds'}><SoundIcon enabled={soundEnabled} /></button>
           <button className="icon-button" onClick={() => setPaused(value => !value)} aria-label={paused ? 'Resume motion' : 'Pause motion'} title={paused ? 'Resume motion' : 'Pause motion'}><PauseIcon paused={paused} /></button>
           <button className="icon-button" onClick={reset} aria-label="Reset composition" title="Reset composition"><ResetIcon /></button>
           {document.fullscreenEnabled && <button className="icon-button fullscreen-button" onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}><ExpandIcon /></button>}

@@ -3,15 +3,20 @@ import { makeMusicIcons, type MusicIcon } from './musicIcons'
 import { createStudio } from './studio'
 import { createOrbits } from './orbits'
 import { createContactLighting } from './contactLighting'
+import { createBurstLifecycle } from './burstLifecycle'
+import { createBurstEffects } from './burstEffects'
+import { createBurstAudio } from './burstAudio'
 
 export interface OrnamentScene {
   dispose: () => void
   reset: () => void
   scatter: () => void
   setPaused: (paused: boolean) => void
+  setSoundEnabled: (enabled: boolean) => void
 }
 
 interface Body {
+  enabled?: boolean
   halfSize: THREE.Vector3
   shapePower: number
   home: THREE.Vector3
@@ -92,6 +97,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
 
   const studio = createStudio(renderer, scene)
   const orbits = createOrbits(cluster)
+  const burstEffects = createBurstEffects(cluster)
+  const burstAudio = createBurstAudio()
   const finishes: Record<Finish, THREE.MeshPhysicalMaterial> = {
     ink: new THREE.MeshPhysicalMaterial({ color: '#101421', roughness: .32, metalness: .08, clearcoat: .32, clearcoatRoughness: .32, envMapIntensity: .9 }),
     coral: new THREE.MeshPhysicalMaterial({ color: '#f18f86', roughness: .28, metalness: 0, clearcoat: .62, clearcoatRoughness: .25, envMapIntensity: .9 }),
@@ -175,6 +182,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const bubbleInteraction = { hover: false, dragging: -1, pointer: smoothPointer, dragTarget: pointerWorld, velocity: pointerVelocity }
   const cursorPosition = new THREE.Vector2(-100, -100)
   const cursorTarget = new THREE.Vector2(-100, -100)
+  const pressOrigin = new THREE.Vector2()
+  let canInflate = false
   let active = false
   let dragging = -1
   let pointerId: number | null = null
@@ -236,11 +245,52 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   // The glass spheres participate in the same raycast and drag path as the tiles.
   const interactiveMeshes = [...meshes, orbits.bubbleMesh]
   const interactiveBodies = [...bodies, ...orbits.bubbleBodies]
+  const burstColor = new THREE.Color('#ebd9ff')
+  const burstOrigin = new THREE.Vector3()
+  const lifecycle = createBurstLifecycle(interactiveBodies, (index, body) => {
+    burstOrigin.copy(body.position)
+    burstColor.set(index < COUNT ? finishes[pieces[index].finish].color : '#ebd9ff')
+    burstEffects.burst(burstOrigin, body.radius, burstColor)
+    burstAudio.play(body.isSphere === true || pieces[index]?.r < .5)
+    // A restrained pressure pulse passes through neighboring ornaments and cable.
+    const reach = body.radius + 2.1
+    interactiveBodies.forEach((neighbor, i) => {
+      if (i === index || neighbor.enabled === false) return
+      delta.subVectors(neighbor.position, burstOrigin)
+      const distance = delta.length()
+      if (distance > .001 && distance < reach) neighbor.velocity.addScaledVector(delta, (1 - distance / reach) * 3 / distance)
+    })
+    orbits.wire.positions.forEach((point, i) => {
+      delta.subVectors(point, burstOrigin)
+      const distance = delta.length()
+      if (distance > .001 && distance < reach) orbits.wire.velocities[i].addScaledVector(delta, (1 - distance / reach) * 2 / distance)
+    })
+    dragging = -1; canInflate = false
+    cursor.classList.remove('is-dragging', 'is-charging')
+    cursor.style.setProperty('--charge', '0')
+    if (import.meta.env.DEV) host.dataset.lastBurst = String(index)
+  }, (index, body, generation) => {
+    // Start fully outside the current viewport, at the ornament's natural side.
+    const angle = Math.atan2(body.home.y, body.home.x || .01) + Math.sin(index * 2.4 + generation) * .32
+    const x = Math.cos(angle), y = Math.sin(angle)
+    const distance = Math.min((camera.right + body.radius * cluster.scale.x * 2) / Math.max(.001, Math.abs(x)), (camera.top + body.radius * cluster.scale.x * 2) / Math.max(.001, Math.abs(y)))
+    offset.set(x * distance, y * distance, body.home.z * cluster.scale.x)
+    cluster.worldToLocal(offset)
+    body.position.copy(offset)
+    if (index < COUNT) body.rotation.copy(bodies[index].rest)
+  })
+  const bubbleRadiusAt = (index: number) => lifecycle.scale(COUNT + index, renderAlpha)
+  let renderAlpha = 1
 
   const step = (dt: number, settling = false) => {
     elapsed += settling ? 0 : dt
+    if (!settling) {
+      lifecycle.setTarget(canInflate ? dragging : -1)
+      lifecycle.step(dt)
+    }
     for (let i = 0; i < COUNT; i++) {
       const body = bodies[i]
+      if (body.enabled === false) continue
       const { position: p, velocity: v, radius: r } = body
       body.previous.copy(p)
       // Gentle springs preserve the composition while every piece remains tangible.
@@ -278,8 +328,10 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     for (let iteration = 0; iteration < 3; iteration++) {
       for (let i = 0; i < COUNT; i++) {
         const a = bodies[i]
+        if (a.enabled === false) continue
         for (let j = i + 1; j < COUNT; j++) {
           const b = bodies[j]
+          if (b.enabled === false) continue
           delta.subVectors(b.position, a.position)
           const minDistance = (a.radius + b.radius) * .94
           const d2 = delta.lengthSq()
@@ -303,6 +355,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
 
     if (!settling) {
       for (const body of bodies) {
+        if (body.enabled === false) continue
         body.spin.multiplyScalar(Math.exp(-1.4 * dt))
         angularAxis.set(body.spin.x + Math.sin(elapsed * .4 + body.phase) * .04, body.spin.y + Math.cos(elapsed * .3 + body.phase) * .055, body.spin.z + .015)
         const speed = angularAxis.length()
@@ -319,23 +372,29 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   }
 
   const updateInstances = (alpha = 1) => {
-    orbits.update(alpha)
+    renderAlpha = alpha
+    orbits.update(alpha, bubbleRadiusAt)
     cluster.rotation.y = Math.sin(elapsed * .14) * .025
     cluster.rotation.z = Math.sin(elapsed * .2) * .014
     cluster.updateMatrixWorld(true)
     bodies.forEach((body, i) => {
+      body.object.visible = body.enabled !== false
+      body.object.scale.setScalar(lifecycle.scale(i, alpha))
       body.object.position.lerpVectors(body.previous, body.position, alpha)
       body.object.quaternion.copy(body.rotation)
       offset.copy(body.object.position).applyMatrix4(cluster.matrixWorld)
-      contactLighting.setSphere(i, offset, body.radius * cluster.scale.x * .79)
+      contactLighting.setSphere(i, offset, body.enabled === false ? 0 : body.radius * cluster.scale.x * .79)
     })
     contactLighting.update()
   }
 
   const reset = () => {
     dragging = -1
+    canInflate = false
+    lifecycle.reset(); burstEffects.reset(); burstAudio.stop()
     active = false
-    cursor.classList.remove('is-dragging')
+    cursor.classList.remove('is-dragging', 'is-charging')
+    cursor.style.setProperty('--charge', '0')
     elapsed = 0
     fillBodies()
     orbits.reset()
@@ -349,6 +408,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const scatter = () => {
     if (paused) return
     for (const body of bodies) {
+      if (body.enabled === false) continue
       delta.copy(body.position).normalize()
       body.velocity.addScaledVector(delta, 4 + random() * 3)
       body.spin.add(new THREE.Vector3(random() - .5, random() - .5, random() - .5).multiplyScalar(3))
@@ -371,6 +431,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     // Sharper Retina silhouettes, with a pixel budget for large desktop displays.
     renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio, 1.5), 2, Math.sqrt(5_000_000 / (width * height))))
     renderer.setSize(width, height)
+    burstEffects.resize(height / viewHeight * renderer.getPixelRatio() * cluster.scale.x)
     if (import.meta.env.DEV) {
       host.dataset.pixelRatio = renderer.getPixelRatio().toFixed(2)
       host.dataset.msaaSamples = String(sampleCount)
@@ -397,16 +458,26 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     if (event.pointerType !== 'touch') cursor.classList.add('visible')
   }
 
-  const onMove = (event: PointerEvent) => projectPointer(event)
+  const onMove = (event: PointerEvent) => {
+    projectPointer(event)
+    if (pointerId !== null && pressOrigin.distanceTo(cursorTarget) > 9) canInflate = false
+  }
   const onDown = (event: PointerEvent) => {
     if (event.button !== 0 || pointerId !== null) return
     projectPointer(event)
     if (paused) return
+    burstAudio.unlock()
     raycaster.setFromCamera(pointer, camera)
-    const hit = raycaster.intersectObjects(interactiveMeshes, false)[0]
+    const hit = raycaster.intersectObjects(interactiveMeshes, false).find(candidate => {
+      const index = candidate.object === orbits.bubbleMesh ? COUNT + candidate.instanceId! : candidate.object.userData.bodyIndex as number
+      return lifecycle.canGrab(index)
+    })
     if (hit) {
       dragging = hit.object === orbits.bubbleMesh ? COUNT + hit.instanceId! : hit.object.userData.bodyIndex as number
       dragDepth = interactiveBodies[dragging].position.z + .2
+      projectPointer(event)
+      pressOrigin.copy(cursorTarget)
+      canInflate = true
     }
     pointerId = event.pointerId
     host.setPointerCapture(event.pointerId)
@@ -417,7 +488,10 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId)
     pointerId = null
     dragging = -1
-    cursor.classList.remove('is-dragging')
+    canInflate = false
+    lifecycle.setTarget(-1)
+    cursor.classList.remove('is-dragging', 'is-charging')
+    cursor.style.setProperty('--charge', '0')
     if (event.pointerType === 'touch') active = false
   }
   const onLeave = () => {
@@ -427,9 +501,11 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   }
   const onCancel = () => {
     dragging = -1; pointerId = null; active = false
-    cursor.classList.remove('visible', 'is-dragging')
+    canInflate = false; lifecycle.setTarget(-1)
+    cursor.classList.remove('visible', 'is-dragging', 'is-charging')
+    cursor.style.setProperty('--charge', '0')
   }
-  const onVisibility = () => { previousTime = 0; accumulator = 0 }
+  const onVisibility = () => { previousTime = 0; accumulator = 0; if (document.hidden) { onCancel(); burstAudio.stop() } }
   const onContextLost = (event: Event) => { event.preventDefault(); onError() }
   host.addEventListener('pointermove', onMove)
   host.addEventListener('pointerdown', onDown)
@@ -442,6 +518,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
 
   reset()
   resize()
+  // Include the hidden particle materials so the first pop does not compile shaders.
+  void renderer.compileAsync(scene, camera).catch(() => {})
 
   const tick = (now: number) => {
     if (disposed) return
@@ -456,6 +534,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         host.dataset.drawCalls = String(renderer.info.render.calls)
         host.dataset.triangles = String(renderer.info.render.triangles)
         host.dataset.wireContacts = String(orbits.wire.contacts)
+        host.dataset.bursts = String(lifecycle.pops)
+        host.dataset.soundPlays = String(burstAudio.plays)
         frameCount = 0; sampleTime = now
       }
     }
@@ -470,6 +550,15 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       while (accumulator >= STEP && steps++ < 6) { step(STEP); accumulator -= STEP }
       accumulator = Math.max(0, Math.min(accumulator, STEP))
       updateInstances(accumulator / STEP)
+      burstEffects.update(dt)
+      const charge = dragging >= 0 ? lifecycle.states[dragging].charge : 0
+      cursor.classList.toggle('is-charging', canInflate && charge > .025)
+      cursor.style.setProperty('--charge', String(charge))
+      if (import.meta.env.DEV) {
+        host.dataset.charging = String(dragging)
+        host.dataset.charge = charge.toFixed(2)
+        host.dataset.replacements = String(lifecycle.states.filter(state => state.phase === 'arriving').length)
+      }
       needsRender = true
     }
     if (needsRender) {
@@ -482,7 +571,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
 
   return {
     reset, scatter,
-    setPaused(value) { paused = value; accumulator = 0; needsRender = true },
+    setPaused(value) { paused = value; accumulator = 0; needsRender = true; if (value) { onCancel(); burstAudio.stop() } },
+    setSoundEnabled(value) { burstAudio.setMuted(!value) },
     dispose() {
       disposed = true
       cancelAnimationFrame(raf)
@@ -503,6 +593,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       glyphDark.dispose(); glyphLight.dispose(); glyphLilac.dispose(); glyphPrism.dispose()
       letterMaterial.dispose(); letterTexture.dispose(); orbits.dispose(); studio.dispose()
       contactLighting.dispose()
+      burstEffects.dispose(); burstAudio.dispose()
       renderer.dispose()
       renderer.domElement.remove()
       cursor.classList.remove('visible', 'is-dragging')

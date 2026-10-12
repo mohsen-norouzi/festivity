@@ -16,8 +16,8 @@ export function createOrbits(parent: THREE.Group) {
     contactSettling = settling
     // Reuse the collision list and callback; no per-frame allocations.
     colliders.length = 0
-    for (const cube of cubes) colliders.push(cube)
-    for (const bubble of bubblePhysics.bodies) colliders.push(bubble)
+    for (const cube of cubes) if (cube.enabled !== false) colliders.push(cube)
+    for (const bubble of bubblePhysics.bodies) if (bubble.enabled !== false) colliders.push(bubble)
     bubblePhysics.beginStep(dt, cubes, time, settling, parent.quaternion, interaction)
     wire.step(dt, colliders, time, settling, solveBubbleContacts)
   }
@@ -59,7 +59,7 @@ export function createOrbits(parent: THREE.Group) {
   bubbles.frustumCulled = false
   group.add(bubbles)
   const dummy = new THREE.Object3D()
-  const update = (alpha = 1) => {
+  const update = (alpha = 1, radiusAt?: (index: number) => number) => {
     renderNodes.forEach((point, i) => point.lerpVectors(wire.previous[i], wire.positions[i], alpha))
     for (let i = 0; i < segments; i++) curve.getPoint(i / segments, centers[i])
     centers[segments].copy(centers[0])
@@ -95,7 +95,7 @@ export function createOrbits(parent: THREE.Group) {
     normalAttribute.needsUpdate = true
     bubblePhysics.bodies.forEach((body, i) => {
       dummy.position.lerpVectors(body.previous, body.position, alpha)
-      dummy.scale.setScalar(body.radius)
+      dummy.scale.setScalar(body.enabled === false ? 0 : radiusAt ? radiusAt(i) : body.radius)
       dummy.updateMatrix()
       bubbles.setMatrixAt(i, dummy.matrix)
     })

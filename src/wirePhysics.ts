@@ -10,6 +10,7 @@ export interface WireBody {
   mass: number
   radius: number
   isSphere?: boolean
+  enabled?: boolean
 }
 
 export const WIRE_RADIUS = .013
@@ -57,6 +58,7 @@ export function createWirePhysics(count = 96) {
     for (let candidate = 0; candidate < nearby.length; candidate++) {
       const index = nearby[candidate]
       const body = bodies[index]
+      if (body.enabled === false) continue
       // Sphere contacts use the closest point on the entire cable segment below.
       if (body.isSphere) continue
       delta.subVectors(point, body.position)
@@ -105,6 +107,7 @@ export function createWirePhysics(count = 96) {
   const collideSpheres = (first: number, second: number, bodies: readonly WireBody[], dt: number, settling: boolean) => {
     for (const index of candidates[first]) {
       const body = bodies[index]
+      if (body.enabled === false) continue
       if (!body.isSphere) continue
       segment.subVectors(positions[second], positions[first])
       const lengthSq = segment.lengthSq()
@@ -166,6 +169,7 @@ export function createWirePhysics(count = 96) {
         nearby.length = 0
         for (let j = 0; j < bodies.length; j++) {
           const body = bodies[j]
+          if (body.enabled === false) continue
           const x = point.x - body.position.x, y = point.y - body.position.y, z = point.z - body.position.z
           // Padding covers all motion during the constraint passes, including midpoints.
           if (x * x + y * y + z * z < (body.radius + 1) ** 2) nearby.push(j)

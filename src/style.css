@@ -54,6 +54,10 @@ svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width:
 .scene-cursor span { width: 5px; height: 5px; background: #fff0f7; border-radius: 100%; }
 .scene-cursor.visible { opacity: 1; }
 .scene-cursor.is-dragging { width: 46px; height: 46px; margin: -23px 0 0 -23px; border-color: rgb(255 242 247 / .85); }
+.scene-cursor::before { content: ''; position: absolute; inset: -7px; border-radius: 50%; background: conic-gradient(#ffeaf8 calc(var(--charge, 0) * 360deg), transparent 0); mask: radial-gradient(transparent 63%, #000 66% 71%, transparent 74%); opacity: 0; transition: opacity .15s; }
+.scene-cursor::after { content: 'HOLD'; position: absolute; top: calc(100% + 12px); font-size: 8px; font-weight: 600; letter-spacing: .17em; opacity: 0; transition: opacity .15s; }
+.scene-cursor.is-charging::before, .scene-cursor.is-charging::after { opacity: 1; }
+.scene-cursor.is-charging span { transform: scale(1.5); box-shadow: 0 0 14px #ffcee9; }
 .control-menu { right: var(--edge); top: 79px; width: 246px; color: #171c2e; background: rgb(247 239 250 / .94); backdrop-filter: blur(22px); padding: 24px; border: 1px solid rgb(17 34 42 / .12); box-shadow: 0 15px 50px rgb(53 70 83 / .05); animation: menu-in .22s ease both; }
 .menu-eyebrow { font-size: 9px; letter-spacing: .1em; margin: 0 0 20px; color: #66747b; }
 .control-menu button { font-size: 12px; display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 11px 0; text-align: left; }

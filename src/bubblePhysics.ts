@@ -67,6 +67,7 @@ export function createBubblePhysics() {
       }
     })
     bodies.forEach((body, i) => {
+      if (body.enabled === false) return
       body.previous.copy(body.position)
       delta.copy(body.home).sub(body.position).multiplyScalar(1.6)
       if (!settling) {
@@ -117,8 +118,10 @@ export function createBubblePhysics() {
 
   const solveContacts = (cubes: readonly WireBody[], settling = false) => {
     for (const bubble of bodies) {
+      if (bubble.enabled === false) continue
       for (let index = 0; index < cubes.length; index++) {
         const cube = cubes[index]
+        if (cube.enabled === false) continue
         delta.subVectors(bubble.position, cube.position)
         if (protectSilhouettes) {
           const x = delta.dot(viewX), y = delta.dot(viewY)
@@ -164,6 +167,7 @@ export function createBubblePhysics() {
     }
     for (let i = 0; i < bodies.length; i++) for (let j = i + 1; j < bodies.length; j++) {
       const a = bodies[i], b = bodies[j]
+      if (a.enabled === false || b.enabled === false) continue
       normal.subVectors(a.position, b.position)
       const distance = normal.length(), minimum = a.radius + b.radius + SKIN
       if (distance >= minimum) continue
