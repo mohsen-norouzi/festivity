@@ -163,9 +163,9 @@ export default function App() {
       <button className="floating-card explore-card music-player" onClick={() => scene.current?.toggleMusic()} aria-label={music.playing ? 'Pause music' : 'Play music'} aria-pressed={music.playing}>
         <span className="music-meter" aria-hidden="true"><i /><i /><i /><i /><i /></span>
         <span className="music-copy">
-          <span className="music-eyebrow">{song ? music.playing ? music.audible ? 'NOW PLAYING' : 'SOUND OFF' : 'PAUSED' : 'FIND YOUR FREQUENCY'}</span>
+          <span className="music-eyebrow">{music.error ? 'UNABLE TO PLAY · RETRY' : song ? music.loading ? 'LOADING TRACK' : music.playing ? music.audible ? 'NOW PLAYING' : 'SOUND OFF' : 'PAUSED' : 'FIND YOUR FREQUENCY'}</span>
           <strong>{song?.name ?? 'Explore the sound'}</strong>
-          <span className="music-subtitle">{song ? `${song.genre} · ${song.bpm} BPM` : 'Click a shape to toggle'}</span>
+          <span className="music-subtitle">{song?.artist ?? 'Click a shape to toggle'}</span>
         </span>
         <span className="card-action" aria-hidden="true"><PauseIcon paused={!music.playing} /></span>
       </button>

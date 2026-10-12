@@ -32,7 +32,7 @@ bun run preview
 ## Rendering
 
 - `src/scene.ts`: 26 physical bodies, fixed 90 Hz simulation, interpolated motion, smooth superellipsoid geometry with analytic normals, and physical materials.
-- `src/musicAudio.ts` and `src/musicMoods.ts`: lazy Web Audio instruments, a bounded look-ahead scheduler, gain crossfades, a quiet delay, and a dynamics compressor. No remote tracks or extra audio downloads.
+- `src/musicAudio.ts` and `src/musicMoods.ts`: seven local MP3 recordings, streamed only after a click. At most two media sources are alive during a crossfade; replaced sources release their downloads and buffers. Pause/resume preserves position, and the actual recording's energy and bass attacks drive the reactions. The player shows the track title and artist.
 - `src/tileReactions.ts`: per-symbol reactions, including single-draw equalizer geometry and isolated heart materials. Heartbeat scale is shared by rendered geometry and physical colliders.
 - `src/musicVisuals.ts`: a gently animated background palette. A small half-float background texture updates at 30 Hz; the sculpture stays at the display rate. Audio energy drives restrained atmosphere changes without a bloom pass. Pausing the soundtrack also stops its reactions.
 - `src/musicIcons.ts`: beveled music symbols from official Phosphor SVG contours and the Lucide cloud silhouette. Icons render after transmission to avoid ghosted refraction.
@@ -52,7 +52,21 @@ React + TypeScript + Vite + Bun + Tailwind CSS + Three.js. Festivity is an exper
 
 ## Physics checks
 
-Run `bun test` for cable stretch/stability, reciprocal cube reaction, rounded-surface clearance during dragging, wave propagation/damping, deterministic reset, click inflation, oil adhesion and pinch-off, swept droplet contacts, moving-cube collision regressions, score bounds, transport state, silent startup, rapid mood-switching limits, independent reactions, and heartbeat collider/render agreement.
+Run `bun test` for cable stretch/stability, reciprocal cube reaction, rounded-surface clearance during dragging, wave propagation/damping, deterministic reset, click inflation, oil adhesion and pinch-off, swept droplet contacts, moving-cube collision regressions, local track mappings, pause/resume, silent startup, crossfades, rapid switching and stale playback cancellation, independent reactions, and heartbeat collider/render agreement.
+
+## Local songs
+
+The uploaded recordings live in `public/songs/`. Assignments and displayed metadata are in `src/musicMoods.ts`.
+
+| Material | Track | Artist |
+| --- | --- | --- |
+| Coral | Sunshine | Moavii |
+| Black | Wavy Strut | Tetuano |
+| Lilac | Pink Clouds | NVL8 |
+| Pearl | Enjoy | Pufino |
+| Glass | That's Life | Johny Grimes |
+| Blue | Back To Promise | Unheard |
+| Small bubbles | Tariro | Pufino |
 
 ## Brand source
 

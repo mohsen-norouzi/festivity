@@ -752,8 +752,10 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     if (import.meta.env.DEV) {
       host.dataset.musicEnergy = sound.energy.toFixed(4)
       host.dataset.musicContext = music.contextState
-      host.dataset.musicVoices = String(music.voices)
-      host.dataset.musicNotes = String(music.scheduledNotes)
+      host.dataset.musicStreams = String(music.streams)
+      host.dataset.musicSource = music.source
+      host.dataset.musicTime = music.time.toFixed(2)
+      host.dataset.musicDuration = music.duration.toFixed(2)
       host.dataset.musicSelected = String(selectedMusic)
       host.dataset.musicReaction = reactions.kind(selectedMusic)
       host.dataset.reactionActivity = reactions.activity(selectedMusic).toFixed(3)
