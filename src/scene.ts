@@ -103,7 +103,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   scene.add(cluster)
 
   const studio = createStudio(renderer, scene)
-  const orbits = createOrbits(cluster)
+  const orbits = createOrbits(cluster, renderer.capabilities.getMaxAnisotropy())
   const burstAudio = createBurstAudio()
   let selectedMusic = -1
   let musicState: MusicState = { mood: null, playing: false, audible: false }
@@ -297,6 +297,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const arrivedAt = new Float64Array(interactiveBodies.length).fill(-Infinity)
   const warmedFinishes = new Set<string>()
   let wireReady = false, wireReveal = 0, settleFrames = 0
+  let ribbonReady = false, ribbonReveal = 0
   const baseRadii = interactiveBodies.map(body => body.radius)
   const burstOrigin = new THREE.Vector3()
   const lifecycle = createBurstLifecycle(interactiveBodies, (index, body) => {
@@ -315,6 +316,11 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       delta.subVectors(point, burstOrigin)
       const distance = delta.length()
       if (distance > .001 && distance < reach) orbits.wire.velocities[i].addScaledVector(delta, (1 - distance / reach) * 2 / distance)
+    })
+    orbits.ribbon.physics.positions.forEach((point, i) => {
+      delta.subVectors(point, burstOrigin)
+      const distance = delta.length()
+      if (distance > .001 && distance < reach) orbits.ribbon.physics.velocities[i].addScaledVector(delta, (1 - distance / reach) * 1.3 / distance)
     })
     dragging = -1; canPuff = false
     cursor.classList.remove('is-dragging', 'is-charging')
@@ -450,6 +456,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     entrance.replay()
     interactiveBodies.forEach(body => { body.enabled = false })
     wireReveal = 0; orbits.reveal(0)
+    ribbonReveal = 0; orbits.ribbon.reveal(0)
     active = false
     cursor.classList.remove('is-dragging', 'is-charging')
     cursor.style.setProperty('--charge', '0')
@@ -627,6 +634,12 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         warmedFinishes.add(finish)
       }
     }
+    // Prepare the extra glass only after the ornaments can already fly in.
+    if (!await nextFrame()) return
+    orbits.ribbon.prepare()
+    await renderer.compileAsync(orbits.ribbon.group, camera, scene)
+    if (disposed) return
+    ribbonReady = true
     if (import.meta.env.DEV) host.dataset.preparationMs = (performance.now() - startedAt).toFixed(0)
   }
 
@@ -675,6 +688,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         host.dataset.drawCalls = String(renderer.info.render.calls)
         host.dataset.triangles = String(renderer.info.render.triangles)
         host.dataset.wireContacts = String(orbits.wire.contacts)
+        host.dataset.ribbonContacts = String(orbits.ribbon.physics.contacts)
         host.dataset.bursts = String(lifecycle.pops)
         host.dataset.soundPlays = String(burstAudio.plays)
         host.dataset.lastSound = burstAudio.lastSound
@@ -687,6 +701,11 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     if (wireReady && entrance.entered > 0 && wireReveal < 1) {
       wireReveal = paused ? 1 : Math.min(1, wireReveal + dt * .9)
       orbits.reveal(wireReveal * wireReveal * (3 - 2 * wireReveal))
+      needsRender = true
+    }
+    if (ribbonReady && entrance.complete && (paused || elapsed > 4) && ribbonReveal < 1) {
+      ribbonReveal = paused ? 1 : Math.min(1, ribbonReveal + dt * .75)
+      orbits.ribbon.reveal(ribbonReveal * ribbonReveal * (3 - 2 * ribbonReveal))
       needsRender = true
     }
     if (paused && (needsRender || settleFrames > 0)) {

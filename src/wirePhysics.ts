@@ -14,15 +14,25 @@ export interface WireBody {
 }
 
 export const WIRE_RADIUS = .013
-const CLEARANCE = WIRE_RADIUS + .035
-const NODE_MASS = .022
+export interface WireOptions {
+  home?: (phase: number) => THREE.Vector3
+  clearance?: number
+  nodeMass?: number
+  bending?: number
+  motion?: number
+  homeStrength?: number
+  damping?: number
+}
 
 /** Fixed-step closed cable. Stretch constraints transmit motion around the loop;
  * soft bending and a weak rest-shape spring prevent kinks without fixing its shape.
  */
-export function createWirePhysics(count = 96) {
+export function createWirePhysics(count = 96, options: WireOptions = {}) {
+  const CLEARANCE = options.clearance ?? WIRE_RADIUS + .035
+  const NODE_MASS = options.nodeMass ?? .022
   const homes = Array.from({ length: count }, (_, i) => {
     const t = i / count * Math.PI * 2
+    if (options.home) return options.home(t)
     const ripple = 1 + .023 * Math.sin(3 * t + .7) + .012 * Math.cos(5 * t)
     return new THREE.Vector3(4.55 * Math.cos(t) * ripple, .77 * Math.sin(t) + .12 * Math.sin(3 * t + .8), 2.95 * Math.sin(t) * ripple)
       .applyAxisAngle(new THREE.Vector3(0, 0, 1), -.17)
@@ -150,15 +160,15 @@ export function createWirePhysics(count = 96) {
       if (!inverses[i]) inverses[i] = new THREE.Quaternion()
       inverses[i].copy(inverse.copy(body.rotation).invert())
     })
-    const damping = Math.exp(-(settling ? 4 : 1.7) * dt)
+    const damping = Math.exp(-(settling ? 4 : options.damping ?? 1.7) * dt)
     for (let i = 0; i < count; i++) {
       previous[i].copy(positions[i])
       const phase = i / count * Math.PI * 2
-      delta.subVectors(homes[i], positions[i]).multiplyScalar(.8)
+      delta.subVectors(homes[i], positions[i]).multiplyScalar(options.homeStrength ?? .8)
       // A small traveling load excites the cable; it does not replace the simulation.
       if (!settling) {
-        delta.y += Math.sin(phase * 3 - time * 1.25) * .2
-        delta.z += Math.sin(phase * 4 + time * .85) * .1
+        delta.y += Math.sin(phase * 3 - time * 1.25) * .2 * (options.motion ?? 1)
+        delta.z += Math.sin(phase * 4 + time * .85) * .1 * (options.motion ?? 1)
       }
       velocities[i].addScaledVector(delta, dt).multiplyScalar(damping).clampLength(0, 12)
       positions[i].addScaledVector(velocities[i], dt)
@@ -172,7 +182,7 @@ export function createWirePhysics(count = 96) {
           if (body.enabled === false) continue
           const x = point.x - body.position.x, y = point.y - body.position.y, z = point.z - body.position.z
           // Padding covers all motion during the constraint passes, including midpoints.
-          if (x * x + y * y + z * z < (body.radius + 1) ** 2) nearby.push(j)
+          if (x * x + y * y + z * z < (body.radius + Math.max(1, CLEARANCE * 2)) ** 2) nearby.push(j)
         }
       }
     }
@@ -183,7 +193,7 @@ export function createWirePhysics(count = 96) {
       for (let n = 0; n < count; n++) {
         const i = iteration % 2 ? count - 1 - n : n
         constrain(i, (i + 1) % count, lengths[i], .94)
-        constrain(i, (i + 2) % count, bendLengths[i], .065)
+        constrain(i, (i + 2) % count, bendLengths[i], options.bending ?? .065)
       }
       for (let i = 0; i < count; i++) collide(positions[i], i, -1, bodies, dt, settling)
       for (let i = 0; i < count; i++) collideSpheres(i, (i + 1) % count, bodies, dt, settling)
