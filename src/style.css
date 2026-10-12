@@ -19,7 +19,8 @@ svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width:
 .is-ready .scene { opacity: 1; }
 .grain { z-index: 2; opacity: .028; mix-blend-mode: multiply; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.86' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='.55' filter='url(%23n)'/%3E%3C/svg%3E"); }
 .hero-header { padding: 29px var(--edge) 0; }
-.wordmark { font-size: clamp(22px, 1.94vw, 32px); letter-spacing: -.9px; transform: scaleX(.96); transform-origin: left center; line-height: 1.2; transition: opacity .2s; }
+.wordmark { width: clamp(160px, 13.4vw, 204px); line-height: 0; transition: opacity .2s; }
+.wordmark img { display: block; width: 100%; height: auto; }
 .wordmark:hover { opacity: .58; }
 .study-index { position: absolute; left: 18.5%; right: 18.5%; font-size: clamp(8px, .73vw, 11px); font-weight: 600; letter-spacing: .055em; }
 .menu-button { display: flex; width: 27px !important; height: 27px !important; flex-direction: column; justify-content: center; gap: 5px; }
@@ -69,7 +70,7 @@ svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width:
 @media (max-width: 767px) {
   .hero { --edge: 23px; }
   .hero-header { padding-top: 25px; }
-  .wordmark { font-size: 26px; }
+  .wordmark { width: 160px; }
   .study-caption { top: 16%; font-size: 10px; }
   .interaction-label { top: 16%; gap: 29px; }
   .interaction-label p { font-size: 8px; }
@@ -174,4 +175,28 @@ svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width:
   .music-subtitle { font-size: 9px; }
   .music-eyebrow { font-size: 6px; }
   .music-meter { width: 26px; scale: .8; }
+}
+
+/* MUSYNC's official lockup and existing hero copy; the scene stays a single canvas. */
+.study-caption h1 { margin: 0; max-width: 235px; font-size: clamp(17px, 1.65vw, 27px); line-height: 1.28; font-weight: 500; letter-spacing: -.045em; }
+.study-caption h1 span { color: #e5d7e8; }
+.brand-symbol { width: clamp(64px, 7.5vw, 126px); transform: none; }
+.brand-symbol img { display: block; width: 100%; height: auto; }
+.brand-symbol:hover { transform: rotate(-7deg); }
+.brand-symbol:active { transform: scale(.94); }
+.join-card { text-decoration: none; transition: background .2s, border-color .2s; }
+.join-card:hover { background: rgb(255 235 249 / .2); border-color: rgb(255 243 253 / .8); }
+.join-card:focus-visible { outline: 1px solid #fff0f5; outline-offset: 5px; }
+@media (max-width: 767px) {
+  .study-caption h1 { max-width: 185px; font-size: 18px; }
+  .brand-symbol { width: 64px; }
+}
+@media (max-width: 767px) {
+  .study-caption .caption-dash { display: none; }
+  .community-card { top: max(28%, calc(16% + 100px)); }
+  .join-card { display: flex; top: calc(16% + 65px); bottom: auto; left: var(--edge); min-width: 0; padding: 0; gap: 9px; border: 0; border-radius: 0; background: none; box-shadow: none; animation: shell-enter 1s .2s both; }
+  .join-card .connection-mark, .join-card p span { display: none; }
+  .join-card p { font-size: 11px; }
+  .join-card .together-star { font-size: 18px; }
+  .join-card:hover { background: none; }
 }

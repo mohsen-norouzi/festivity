@@ -1,6 +1,6 @@
-# Festivity — Music, in Motion
+# Festivity — MUSYNC hero study
 
-A local, single-hero React and Three.js experiment. A floating sculpture of rounded music tiles, capsules, small satellites, a reflective orbit, and iridescent bubbles. Floating cards sit within the same hero; the Explore card becomes a compact music player. Coral ceramic, lilac, pearl, periwinkle, dark satin, and refractive glass sit against a warm-to-cool studio backdrop. No extra pages or deployment.
+A local, single-hero React and Three.js experiment using MUSYNC’s official logo and core messaging. The workspace/project name remains Festivity. A floating sculpture of rounded music tiles, capsules, small satellites, a reflective orbit, and iridescent bubbles. Floating cards sit within the same hero; the Explore card becomes a compact music player. Coral ceramic, lilac, pearl, periwinkle, dark satin, and refractive glass sit against a warm-to-cool studio backdrop. No extra pages or deployment.
 
 ## Run
 
@@ -25,7 +25,7 @@ bun run preview
 - Use the floating player to pause/resume music; the speaker control mutes both music and pops. Music begins only after a gesture, pauses while the tab is hidden, and stops on reset.
 - Every click also adds one inflation puff, including clicks that turn music off. Five clicks pop the shape. Holding and dragging do not add air. A matching replacement floats in.
 - Oil stretches, falls, and leaves wet patches on the moving shapes. Reset clears both pressure and oil.
-- Click **M** to scatter the composition.
+- Click the large MUSYNC play/waveform symbol to scatter the composition.
 - Pause, resume, and reset from the footer or menu.
 - Touch dragging and reduced-motion preferences are supported.
 
@@ -53,3 +53,7 @@ React + TypeScript + Vite + Bun + Tailwind CSS + Three.js. Festivity is an exper
 ## Physics checks
 
 Run `bun test` for cable stretch/stability, reciprocal cube reaction, rounded-surface clearance during dragging, wave propagation/damping, deterministic reset, click inflation, oil adhesion and pinch-off, swept droplet contacts, moving-cube collision regressions, score bounds, transport state, silent startup, rapid mood-switching limits, independent reactions, and heartbeat collider/render agreement.
+
+## Brand source
+
+The full white SVG logo is from https://www.musync.me/assets/Logo_White.svg; the standalone symbol uses its original first path. The favicon and headline are from https://www.musync.me/en/. Public brand assets are stored in `public/brand/`. The existing hero CTA opens the live MUSYNC waitlist in a new tab; no signup form or additional section is included locally.

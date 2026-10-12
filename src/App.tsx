@@ -128,9 +128,9 @@ export default function App() {
       <div ref={cursor} className="scene-cursor pointer-events-none" aria-hidden="true"><span /></div>
 
       <header className="hero-header absolute inset-x-0 top-0 z-20 flex items-center justify-between">
-        <button className="wordmark display-font" onClick={reset} aria-label="Festivity — reset the scene">FESTIVITY</button>
-        <div className="study-index hidden items-center justify-between md:flex" aria-label="A study of sound, artists, connection, culture, and play">
-          <span>SOUND</span><span>ARTISTS</span><span>CONNECTION</span><span>CULTURE</span><span>PLAYGROUND</span>
+        <button className="wordmark" onClick={reset} aria-label="MUSYNC — reset the scene"><img src="/brand/musync-logo-white.svg" alt="MUSYNC" width="429" height="109" /></button>
+        <div className="study-index hidden items-center justify-between md:flex" aria-label="An ecosystem for artists, fans, and Dream Movers">
+          <span>ARTISTS</span><span>FANS</span><span>DREAM MOVERS</span><span>OWNERSHIP</span><span>CONNECTION</span>
         </div>
         <button ref={menuButton} className={`menu-button icon-button ${menuOpen ? 'is-open' : ''}`} aria-label={menuOpen ? 'Close experiment controls' : 'Open experiment controls'} aria-expanded={menuOpen} aria-controls="experiment-controls" onClick={() => setMenuOpen(open => !open)}>
           <span /><span /><span />
@@ -138,7 +138,7 @@ export default function App() {
       </header>
 
       {menuOpen && <div id="experiment-controls" ref={menu} className="control-menu absolute z-30">
-        <p className="menu-eyebrow">EXPERIMENT 001</p>
+        <p className="menu-eyebrow">MUSYNC / SOUND CONTROLS</p>
         <button onClick={() => setPaused(value => !value)}><span>{paused ? 'Resume motion' : 'Pause motion'}</span><PauseIcon paused={paused} /></button>
         <button onClick={reset}><span>Reset composition</span><ResetIcon /></button>
         <button onClick={scatter}><span>Scatter shapes</span><span aria-hidden="true">↗</span></button>
@@ -146,8 +146,7 @@ export default function App() {
       </div>}
 
       <div className="study-caption absolute z-10 pointer-events-none">
-        <p className="font-semibold">Where Sound Takes Shape</p>
-        <p>Artists &amp; Fans. Together.</p>
+        <h1>Take your fans into<br /><span>a new reality.</span></h1>
         <span className="caption-dash" />
       </div>
 
@@ -157,9 +156,9 @@ export default function App() {
         <span className={paused ? 'status-dot is-paused' : 'status-dot'} />
       </div>
 
-      <div className="floating-card community-card" aria-label="Artists and fans, closer through music">
+      <div className="floating-card community-card" aria-label="Real-time royalties and transparent collaborations">
         <div className="avatar-pair" aria-hidden="true"><span><img src={noteIcon} alt="" /></span><span><img src={heartIcon} alt="" /></span></div>
-        <p><strong>Artists × fans</strong><span>Closer through music</span></p>
+        <p><strong>Real-time royalties</strong><span>Transparent collaborations</span></p>
       </div>
       <button className="floating-card explore-card music-player" onClick={() => scene.current?.toggleMusic()} aria-label={music.playing ? 'Pause music' : 'Play music'} aria-pressed={music.playing}>
         <span className="music-meter" aria-hidden="true"><i /><i /><i /><i /><i /></span>
@@ -170,18 +169,18 @@ export default function App() {
         </span>
         <span className="card-action" aria-hidden="true"><PauseIcon paused={!music.playing} /></span>
       </button>
-      <div className="floating-card together-card">
+      <a className="floating-card together-card join-card" href="https://www.musync.me/en/#apply" target="_blank" rel="noopener noreferrer" aria-label="I’m interested — open the MUSYNC waitlist">
         <span className="connection-mark" aria-hidden="true"><i /><i /><i /></span>
-        <p><strong>Independent.</strong><span>Together.</span></p>
-        <span className="together-star" aria-hidden="true">✳</span>
-      </div>
+        <p><strong>I’m interested</strong><span>Meet your next chapter</span></p>
+        <span className="together-star" aria-hidden="true">↗</span>
+      </a>
 
-      <button className="large-x display-font absolute z-10" onClick={scatter} aria-label="Scatter the shapes" title="Scatter the shapes">M</button>
+      <button className="large-x brand-symbol absolute z-10" onClick={scatter} aria-label="Scatter the shapes" title="Scatter the shapes"><img src="/brand/musync-symbol-white.svg" alt="" width="96" height="109" /></button>
       <div className="edition absolute z-10 flex items-center pointer-events-none" aria-label="Experiment 01"><span className="display-font">01</span><span className="edition-dash" /></div>
 
       <footer className="hero-footer absolute inset-x-0 bottom-0 z-20 flex items-end justify-between">
-        <div className="material-caption"><p className="font-semibold">Made to Move You</p><p>A Study in Sound &amp; Connection</p></div>
-        <h1 className="hero-title">MUSIC, IN MOTION</h1>
+        <div className="material-caption"><p className="font-semibold">No middlemen.</p><p>Closer to your fans.</p></div>
+        <p className="hero-title">ANYWHERE. FOR ANYONE.</p>
         <div className="simulation-controls flex items-center">
           <span className="simulation-label">{paused ? 'MOTION PAUSED' : 'LIVE SIMULATION'}</span>
           <button className="icon-button" onClick={toggleSound} aria-label={soundEnabled ? 'Mute all audio' : 'Enable audio'} aria-pressed={soundEnabled} title={soundEnabled ? 'Mute all audio' : 'Enable audio'}><SoundIcon enabled={soundEnabled} /></button>
