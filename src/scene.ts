@@ -40,7 +40,7 @@ interface Body {
 
 type Finish = 'ink' | 'coral' | 'lilac' | 'pearl' | 'glass' | 'blue'
 type Form = 'tile' | 'capsule'
-interface Piece { p: [number, number, number]; r: number; finish: Finish; icon?: MusicIcon; lettering?: boolean; form?: Form; tilt?: [number, number, number] }
+interface Piece { p: [number, number, number]; r: number; finish: Finish; icon?: MusicIcon; lettering?: readonly string[]; form?: Form; tilt?: [number, number, number] }
 const pieces: Piece[] = [
   { p: [-.46, .22, 2.8], r: 1.38, finish: 'glass', icon: 'wave', tilt: [.12, -.22, .24] },
   { p: [-2.22, .6, 1.83], r: 1.01, finish: 'pearl', icon: 'pause', tilt: [.16, .22, -.25] },
@@ -48,13 +48,13 @@ const pieces: Piece[] = [
   { p: [.61, -1.45, 2.31], r: 1.02, finish: 'coral', icon: 'heart', tilt: [.15, .2, -.23] },
   { p: [1.24, 1.7, .9], r: .94, finish: 'pearl', icon: 'wave', tilt: [.17, -.15, .2] },
   { p: [1.62, .22, 2.05], r: .92, finish: 'glass', icon: 'headphones', tilt: [.12, -.32, .23] },
-  { p: [2.89, -.28, 1.37], r: 1.04, finish: 'ink', lettering: true, tilt: [.15, -.23, .3] },
+  { p: [2.89, -.28, 1.37], r: 1.04, finish: 'ink', lettering: ['REAL-TIME', 'ROYALTIES'], tilt: [.15, -.23, .3] },
   { p: [2.32, -1.85, 1.02], r: .98, finish: 'blue', icon: 'cloud', tilt: [.12, -.25, .22] },
-  { p: [-2.24, -1.1, 1.3], r: .88, finish: 'ink', icon: 'globe', tilt: [.14, .15, -.25] },
+  { p: [-2.24, -1.1, 1.3], r: .88, finish: 'ink', lettering: ['DIRECT', 'TO FAN'], tilt: [.14, .15, -.25] },
   { p: [-1.15, -2.03, 1.7], r: .7, finish: 'glass', icon: 'sparkle', tilt: [.13, .2, -.3] },
   { p: [-3.06, -.1, -.4], r: .92, finish: 'lilac', form: 'capsule', tilt: [.25, .22, -.12] },
   { p: [.05, 2.44, -.4], r: .7, finish: 'coral', icon: 'sparkle', tilt: [.2, -.2, .28] },
-  { p: [2.3, 1.62, -.65], r: .86, finish: 'ink', tilt: [.2, .4, .28] },
+  { p: [2.3, 1.62, -.65], r: .86, finish: 'ink', lettering: ['NO', 'MIDDLEMEN'], tilt: [.2, .4, .28] },
   { p: [2.25, .6, -.48], r: .81, finish: 'blue', icon: 'play', tilt: [.2, -.3, .16] },
   { p: [3.09, .21, -.81], r: .77, finish: 'coral', tilt: [.2, .3, .3] },
   { p: [3.55, -.96, -.55], r: .61, finish: 'pearl', tilt: [.2, -.4, .35] },
@@ -148,18 +148,25 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const glyphLight = new THREE.MeshPhysicalMaterial({ color: '#fff0f5', metalness: .08, roughness: .25, clearcoat: .45, dithering: true, transparent: true })
   const glyphLilac = new THREE.MeshPhysicalMaterial({ color: '#d8bde9', metalness: .25, roughness: .3, clearcoat: .3, dithering: true, transparent: true })
   const glyphPrism = new THREE.MeshPhysicalMaterial({ color: '#f5dbff', metalness: .2, roughness: .2, clearcoat: .7, emissive: '#a76fe0', emissiveIntensity: .12, dithering: true, transparent: true })
-  const letterCanvas = document.createElement('canvas')
-  letterCanvas.width = letterCanvas.height = 512
-  const letterContext = letterCanvas.getContext('2d')!
-  letterContext.fillStyle = '#ffffff'
-  letterContext.textAlign = 'center'
-  letterContext.font = '500 43px Arial, sans-serif'
-  letterContext.letterSpacing = '5px'
-  ;['CREATE', 'CONNECT', 'GROW'].forEach((line, i) => letterContext.fillText(line, 256, 191 + i * 65))
-  const letterTexture = new THREE.CanvasTexture(letterCanvas)
-  letterTexture.colorSpace = THREE.SRGBColorSpace
-  letterTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
-  const letterMaterial = new THREE.MeshBasicMaterial({ color: '#e0c9f0', map: letterTexture, transparent: true, depthWrite: false, toneMapped: false })
+  const letterTextures: THREE.CanvasTexture[] = []
+  const letterMaterials: THREE.MeshBasicMaterial[] = []
+  const createLetterMaterial = (lines: readonly string[]) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 512
+    const context = canvas.getContext('2d')!
+    context.fillStyle = '#ffffff'
+    context.textAlign = 'center'
+    context.font = '500 43px Arial, sans-serif'
+    context.letterSpacing = '5px'
+    context.textBaseline = 'middle'
+    lines.forEach((line, i) => context.fillText(line, 256, 256 + (i - (lines.length - 1) / 2) * 64))
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
+    const material = new THREE.MeshBasicMaterial({ color: '#e0c9f0', map: texture, transparent: true, depthWrite: false, toneMapped: false })
+    letterTextures.push(texture); letterMaterials.push(material)
+    return material
+  }
   const icons = createMusicIcons()
   // Evenly tessellated superellipsoids have continuous curvature across the face,
   // not just beveled corners. Analytic normals keep moving highlights smooth.
@@ -267,7 +274,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     if (piece.lettering) {
       const letterGeometry = new THREE.PlaneGeometry(1.1, 1.1)
       geometries.push(letterGeometry)
-      const lettering = new THREE.Mesh(letterGeometry, letterMaterial)
+      const lettering = new THREE.Mesh(letterGeometry, createLetterMaterial(piece.lettering))
       lettering.position.z = geometry.boundingBox!.max.z + .012
       object.add(lettering)
       reactions.register(index, lettering)
@@ -753,7 +760,9 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     smallTile.dispose(); icons.dispose()
     Object.values(finishes).forEach(material => material.dispose())
     glyphDark.dispose(); glyphLight.dispose(); glyphLilac.dispose(); glyphPrism.dispose()
-    letterMaterial.dispose(); letterTexture.dispose(); orbits.dispose(); studio.dispose()
+    letterMaterials.forEach(material => material.dispose())
+    letterTextures.forEach(texture => texture.dispose())
+    orbits.dispose(); studio.dispose()
     contactLighting.dispose(); musicVisuals.dispose(); reactions.dispose()
     heartMaterials.forEach(material => material.dispose())
     burstEffects.dispose(); burstAudio.dispose()
