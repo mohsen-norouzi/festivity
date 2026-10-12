@@ -21,6 +21,8 @@ bun run preview
 
 - Move through the sculpture to push the shapes.
 - Hold and drag a piece; release it to let it settle. Cubes bend the wire, and wire tension gently pushes and turns them in return.
+- Click or tap a shape five times to inflate it with successive puffs, then pop it. Holding and dragging do not add air. A matching replacement floats in.
+- Oil stretches, falls, and leaves wet patches on the moving shapes. Reset clears both pressure and oil.
 - Click **M** to scatter the composition.
 - Pause, resume, and reset from the footer or menu.
 - Touch dragging and reduced-motion preferences are supported.
@@ -32,6 +34,8 @@ bun run preview
 - `src/orbits.ts`: a dynamically updated cable mesh with continuous transported normals, plus five instanced iridescent glass bubbles.
 - `src/studio.ts`: a baked studio environment, feathered softboxes, and a procedural gradient backdrop with soft diagonal light streaks.
 - `src/wirePhysics.ts`: a 96-node closed cable with stretch/bending constraints, a weak rest spring, traveling loads, and two-way rounded-cube contact at the same 90 Hz fixed step. Node and segment contacts keep the wire outside the cube surfaces.
+- `src/burstLifecycle.ts`: discrete five-click inflation, a soft puff response, one pop per cycle, and matching replacements.
+- `src/liquidCollision.ts`: continuous oil contacts against translating and rotating rounded bodies, including drop width and full liquid strands. Oil and cubes share the fixed simulation step.
 - `src/contactLighting.ts`: all-neighbor contact lighting compressed into directional coefficients, with three texture samples per vertex and no nearest-neighbor switching.
 - `src/App.tsx` and `src/style.css`: accessible controls and responsive hero layout.
 
@@ -43,4 +47,4 @@ React + TypeScript + Vite + Bun + Tailwind CSS + Three.js. Festivity is an exper
 
 ## Physics checks
 
-Run `bun test` for cable stretch/stability, reciprocal cube reaction, rounded-surface clearance during dragging, wave propagation/damping, and deterministic reset.
+Run `bun test` for cable stretch/stability, reciprocal cube reaction, rounded-surface clearance during dragging, wave propagation/damping, deterministic reset, click inflation, oil adhesion and pinch-off, swept droplet contacts, and moving-cube collision regressions.

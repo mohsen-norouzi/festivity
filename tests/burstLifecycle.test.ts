@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import * as THREE from 'three'
-import { createBurstLifecycle, INFLATE_SECONDS, type BurstBody } from '../src/burstLifecycle'
+import { createBurstLifecycle, PUFFS_TO_POP, FINAL_PUFF_SECONDS, type BurstBody } from '../src/burstLifecycle'
 import { createOrbits } from '../src/orbits'
 
 const dt = 1 / 90
@@ -9,53 +9,61 @@ const makeBody = (): BurstBody => ({
   velocity: new THREE.Vector3(), rotation: new THREE.Quaternion(), spin: new THREE.Vector3(), halfSize: new THREE.Vector3(.7, .7, .6),
   shapePower: 3.8, mass: 1, radius: 1,
 })
+const advance = (life: ReturnType<typeof createBurstLifecycle>, seconds: number) => {
+  for (let i = 0; i < Math.ceil(seconds / dt); i++) life.step(dt)
+}
 
-describe('hold, burst, and replacement', () => {
-  test('inflates collision dimensions and smoothly deflates after an early release', () => {
+describe('click to puff, burst, and replacement', () => {
+  test('time alone never inflates; one click adds one lasting puff with matching collision dimensions', () => {
     const body = makeBody(), start = body.halfSize.clone()
-    let pops = 0
-    const life = createBurstLifecycle([body], () => pops++, () => {})
-    life.setTarget(0)
-    for (let i = 0; i < 65; i++) life.step(dt)
-    expect(body.radius).toBeGreaterThan(1.25)
+    const life = createBurstLifecycle([body], () => {}, () => {})
+    advance(life, 5)
+    expect(body.radius).toBe(1)
+    expect(life.states[0].puffs).toBe(0)
+    life.puff(0)
+    advance(life, .35)
+    expect(body.radius).toBeGreaterThan(1.1)
     expect(body.halfSize.x / start.x).toBeCloseTo(body.radius)
     expect(life.scale(0)).toBeCloseTo(body.radius)
-    life.setTarget(-1)
-    for (let i = 0; i < 90; i++) life.step(dt)
-    expect(pops).toBe(0)
-    expect(body.radius).toBeCloseTo(1, 3)
+    advance(life, 10)
+    expect(life.states[0].puffs).toBe(1)
+    expect(life.pops).toBe(0)
+    expect(body.radius).toBeCloseTo(1 + .58 / PUFFS_TO_POP, 4)
     expect(body.mass).toBe(1)
   })
 
-  test('bursts once per hold, disappears, then brings a full-size matching body in from outside', () => {
+  test('five clicks cause one pop, then a fresh dry replacement comes from outside', () => {
     const body = makeBody()
     let pops = 0, spawns = 0
     const life = createBurstLifecycle([body], () => pops++, (_index, incoming) => { spawns++; incoming.position.set(10, 0, 0) })
-    life.setTarget(0)
-    for (let i = 0; i < Math.ceil(INFLATE_SECONDS / dt) + 1; i++) life.step(dt)
+    for (let i = 0; i < PUFFS_TO_POP - 1; i++) { expect(life.puff(0)).toBe(true); advance(life, .12) }
+    expect(pops).toBe(0)
+    expect(body.radius).toBeGreaterThan(1.4)
+    expect(life.puff(0)).toBe(true)
+    expect(life.puff(0)).toBe(false)
+    advance(life, FINAL_PUFF_SECONDS + .01)
     expect(pops).toBe(1)
     expect(body.enabled).toBe(false)
     expect(life.canGrab(0)).toBe(false)
-    for (let i = 0; i < 28; i++) life.step(dt)
+    advance(life, .32)
     expect(spawns).toBe(1)
     expect(body.enabled).toBe(true)
     expect(body.position.x).toBe(10)
     expect(body.previous.equals(body.position)).toBe(true)
     expect(body.radius).toBe(1)
+    expect(life.states[0].puffs).toBe(0)
+    expect(life.puff(0)).toBe(false)
     body.position.copy(body.home)
-    for (let i = 0; i < 400; i++) { life.setTarget(0); life.step(dt) }
+    advance(life, 4)
     expect(pops).toBe(1)
     expect(life.canGrab(0)).toBe(true)
-    life.setTarget(-1); life.setTarget(0)
-    for (let i = 0; i < 125; i++) life.step(dt)
-    expect(pops).toBe(2)
   })
 
-  test('a popped glass instance is hidden and excluded from simulation until replacement', () => {
+  test('a popped sphere is hidden until replacement and uses the same discrete puff interaction', () => {
     const parent = new THREE.Group(), orbits = createOrbits(parent)
     const life = createBurstLifecycle(orbits.bubbleBodies, () => {}, (_i, body) => body.position.set(9, 0, 0))
-    life.setTarget(3)
-    for (let i = 0; i < 123; i++) { life.step(dt); orbits.step(dt, [], i * dt) }
+    for (let i = 0; i < PUFFS_TO_POP; i++) life.puff(3)
+    advance(life, FINAL_PUFF_SECONDS + .01)
     const sphere = orbits.bubbleBodies[3], location = sphere.position.clone()
     orbits.update()
     const matrix = new THREE.Matrix4(), scale = new THREE.Vector3()
@@ -64,7 +72,7 @@ describe('hold, burst, and replacement', () => {
     expect(scale.length()).toBe(0)
     orbits.step(dt, [], 2)
     expect(sphere.position.equals(location)).toBe(true)
-    for (let i = 0; i < 28; i++) life.step(dt)
+    advance(life, .32)
     orbits.update()
     orbits.bubbleMesh.getMatrixAt(3, matrix)
     scale.setFromMatrixScale(matrix)
@@ -73,16 +81,16 @@ describe('hold, burst, and replacement', () => {
     orbits.dispose()
   })
 
-  test('reset restores every body and cancels pending replacement', () => {
+  test('reset clears accumulated pressure and cancels the final puff', () => {
     const body = makeBody()
     let spawns = 0
     const life = createBurstLifecycle([body], () => {}, () => spawns++)
-    life.setTarget(0)
-    for (let i = 0; i < 123; i++) life.step(dt)
+    for (let i = 0; i < PUFFS_TO_POP; i++) life.puff(0)
     life.reset()
-    for (let i = 0; i < 300; i++) life.step(dt)
+    advance(life, 5)
     expect(spawns).toBe(0)
     expect(life.pops).toBe(0)
+    expect(life.states[0].puffs).toBe(0)
     expect(body.enabled).toBe(true)
     expect(body.radius).toBe(1)
     expect(life.canGrab(0)).toBe(true)

@@ -183,7 +183,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const cursorPosition = new THREE.Vector2(-100, -100)
   const cursorTarget = new THREE.Vector2(-100, -100)
   const pressOrigin = new THREE.Vector2()
-  let canInflate = false
+  let canPuff = false
+  let pressTime = 0, feedbackIndex = -1, feedbackTime = 0
   let active = false
   let dragging = -1
   let pointerId: number | null = null
@@ -264,7 +265,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       const distance = delta.length()
       if (distance > .001 && distance < reach) orbits.wire.velocities[i].addScaledVector(delta, (1 - distance / reach) * 2 / distance)
     })
-    dragging = -1; canInflate = false
+    dragging = -1; canPuff = false
     cursor.classList.remove('is-dragging', 'is-charging')
     cursor.style.setProperty('--charge', '0')
     if (import.meta.env.DEV) host.dataset.lastBurst = String(index)
@@ -284,7 +285,6 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const step = (dt: number, settling = false) => {
     elapsed += settling ? 0 : dt
     if (!settling) {
-      lifecycle.setTarget(canInflate ? dragging : -1)
       lifecycle.step(dt)
     }
     for (let i = 0; i < COUNT; i++) {
@@ -298,7 +298,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       v.y += ((body.home.y - p.y) * 3.8 + float) * dt
       v.z += (body.home.z - p.z) * 4.2 * dt
 
-      if (!settling && i === dragging) {
+      if (!settling && i === dragging && !canPuff) {
         v.x += (pointerWorld.x - p.x) * 70 * dt
         v.y += (pointerWorld.y - p.y) * 70 * dt
         v.z += (dragDepth - p.z) * 70 * dt
@@ -366,8 +366,9 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       }
     }
     bubbleInteraction.hover = active && dragging < 0
-    bubbleInteraction.dragging = dragging >= COUNT ? dragging - COUNT : -1
+    bubbleInteraction.dragging = dragging >= COUNT && !canPuff ? dragging - COUNT : -1
     orbits.step(dt, bodies, elapsed, settling, bubbleInteraction)
+    if (!settling) burstEffects.step(dt, interactiveBodies)
   }
 
   const updateInstances = (alpha = 1) => {
@@ -389,7 +390,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
 
   const reset = () => {
     dragging = -1
-    canInflate = false
+    canPuff = false; feedbackIndex = -1
     lifecycle.reset(); burstEffects.reset(); burstAudio.stop()
     active = false
     cursor.classList.remove('is-dragging', 'is-charging')
@@ -459,7 +460,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
 
   const onMove = (event: PointerEvent) => {
     projectPointer(event)
-    if (pointerId !== null && pressOrigin.distanceTo(cursorTarget) > 9) canInflate = false
+    if (pointerId !== null && pressOrigin.distanceTo(cursorTarget) > 9) canPuff = false
   }
   const onDown = (event: PointerEvent) => {
     if (event.button !== 0 || pointerId !== null) return
@@ -471,12 +472,14 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       const index = candidate.object === orbits.bubbleMesh ? COUNT + candidate.instanceId! : candidate.object.userData.bodyIndex as number
       return lifecycle.canGrab(index)
     })
+    dragging = -1; canPuff = false
     if (hit) {
       dragging = hit.object === orbits.bubbleMesh ? COUNT + hit.instanceId! : hit.object.userData.bodyIndex as number
       dragDepth = interactiveBodies[dragging].position.z + .2
       projectPointer(event)
       pressOrigin.copy(cursorTarget)
-      canInflate = true
+      canPuff = true
+      pressTime = performance.now()
     }
     pointerId = event.pointerId
     host.setPointerCapture(event.pointerId)
@@ -484,14 +487,21 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   }
   const onUp = (event: PointerEvent) => {
     if (event.pointerId !== pointerId) return
-    if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId)
+    const clicked = dragging
+    const isClick = canPuff && clicked >= 0 && performance.now() - pressTime < 450 && pressOrigin.distanceTo(new THREE.Vector2(event.clientX, event.clientY)) <= 9
+    if (isClick && lifecycle.puff(clicked)) {
+      feedbackIndex = clicked; feedbackTime = performance.now()
+      // A click injects air without nudging the shape away from the next click.
+      active = false
+    }
+    const releasedPointer = pointerId
     pointerId = null
+    if (host.hasPointerCapture(releasedPointer)) host.releasePointerCapture(releasedPointer)
     dragging = -1
-    canInflate = false
-    lifecycle.setTarget(-1)
+    canPuff = false
     cursor.classList.remove('is-dragging', 'is-charging')
     cursor.style.setProperty('--charge', '0')
-    if (event.pointerType === 'touch') active = false
+    active = false
   }
   const onLeave = () => {
     if (pointerId !== null) return
@@ -500,17 +510,18 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   }
   const onCancel = () => {
     dragging = -1; pointerId = null; active = false
-    canInflate = false; lifecycle.setTarget(-1)
+    canPuff = false
     cursor.classList.remove('visible', 'is-dragging', 'is-charging')
     cursor.style.setProperty('--charge', '0')
   }
   const onVisibility = () => { previousTime = 0; accumulator = 0; if (document.hidden) { onCancel(); burstAudio.stop() } }
+  const onLostCapture = (event: PointerEvent) => { if (event.pointerId === pointerId) onCancel() }
   const onContextLost = (event: Event) => { event.preventDefault(); onError() }
   host.addEventListener('pointermove', onMove)
   host.addEventListener('pointerdown', onDown)
   host.addEventListener('pointerup', onUp)
   host.addEventListener('pointercancel', onCancel)
-  host.addEventListener('lostpointercapture', onCancel)
+  host.addEventListener('lostpointercapture', onLostCapture)
   host.addEventListener('pointerleave', onLeave)
   renderer.domElement.addEventListener('webglcontextlost', onContextLost)
   document.addEventListener('visibilitychange', onVisibility)
@@ -550,12 +561,16 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       while (accumulator >= STEP && steps++ < 6) { step(STEP); accumulator -= STEP }
       accumulator = Math.max(0, Math.min(accumulator, STEP))
       updateInstances(accumulator / STEP)
-      burstEffects.update(dt, interactiveBodies)
-      const charge = dragging >= 0 ? lifecycle.states[dragging].charge : 0
-      cursor.classList.toggle('is-charging', canInflate && charge > .025)
+      burstEffects.render(interactiveBodies, renderAlpha)
+      const charge = feedbackIndex >= 0 ? lifecycle.states[feedbackIndex].charge : 0
+      cursor.classList.toggle('is-charging', charge > 0 && now - feedbackTime < 1800)
       cursor.style.setProperty('--charge', String(charge))
       if (import.meta.env.DEV) {
-        host.dataset.charging = String(dragging)
+        host.dataset.wetDrops = String(burstEffects.surfaceDrops)
+        host.dataset.oilStrands = String(burstEffects.oilStrands)
+        host.dataset.liquidDrops = String(burstEffects.activeFragments)
+        host.dataset.charging = String(feedbackIndex)
+        host.dataset.puffs = String(feedbackIndex >= 0 ? lifecycle.states[feedbackIndex].puffs : 0)
         host.dataset.charge = charge.toFixed(2)
         host.dataset.replacements = String(lifecycle.states.filter(state => state.phase === 'arriving').length)
       }
@@ -581,7 +596,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       host.removeEventListener('pointerdown', onDown)
       host.removeEventListener('pointerup', onUp)
       host.removeEventListener('pointercancel', onCancel)
-      host.removeEventListener('lostpointercapture', onCancel)
+      host.removeEventListener('lostpointercapture', onLostCapture)
       host.removeEventListener('pointerleave', onLeave)
       document.removeEventListener('visibilitychange', onVisibility)
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost)

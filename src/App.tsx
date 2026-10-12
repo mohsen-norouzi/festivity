@@ -98,7 +98,7 @@ export default function App() {
 
   return (
     <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''}`}>
-      <div ref={host} className="scene absolute inset-0" role="img" aria-label="An interactive sculpture of glass bubbles and music tiles. Drag to move. Click and hold a shape to inflate and pop it; a matching replacement floats in." />
+      <div ref={host} className="scene absolute inset-0" role="img" aria-label="An interactive sculpture of glass bubbles and music tiles. Drag to move. Click a shape repeatedly to inflate and pop it; a matching replacement floats in." />
       <div className="grain pointer-events-none absolute inset-0" aria-hidden="true" />
       <div ref={cursor} className="scene-cursor pointer-events-none" aria-hidden="true"><span /></div>
 
@@ -117,7 +117,7 @@ export default function App() {
         <button onClick={() => setPaused(value => !value)}><span>{paused ? 'Resume motion' : 'Pause motion'}</span><PauseIcon paused={paused} /></button>
         <button onClick={reset}><span>Reset composition</span><ResetIcon /></button>
         <button onClick={scatter}><span>Scatter shapes</span><span aria-hidden="true">↗</span></button>
-        <p className="menu-hint">Drag to move. Hold still to pop.<br />A new shape floats in to take its place.</p>
+        <p className="menu-hint">Click repeatedly to inflate and pop. Drag to move.<br />A new shape floats in to take its place.</p>
       </div>}
 
       <div className="study-caption absolute z-10 pointer-events-none">
@@ -127,8 +127,8 @@ export default function App() {
       </div>
 
       <div className="interaction-label absolute z-10 pointer-events-none">
-        <p className="desktop-hint">DRAG TO MOVE · HOLD TO POP</p>
-        <p className="touch-hint">DRAG TO MOVE · HOLD TO POP</p>
+        <p className="desktop-hint">DRAG TO MOVE · CLICK TO INFLATE</p>
+        <p className="touch-hint">DRAG TO MOVE · TAP TO INFLATE</p>
         <span className={paused ? 'status-dot is-paused' : 'status-dot'} />
       </div>
 
