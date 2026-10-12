@@ -34,7 +34,7 @@ export default function App() {
     try {
       scene.current = createOrnamentScene(host.current, cursor.current, () => setReady(true), () => setError(true))
     } catch (cause) {
-      console.error('Unable to initialize the ornament scene', cause)
+      console.error('Unable to initialize the music sculpture', cause)
       setError(true)
     }
     return () => { scene.current?.dispose(); scene.current = null }
@@ -85,14 +85,14 @@ export default function App() {
 
   return (
     <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''}`}>
-      <div ref={host} className="scene absolute inset-0" role="img" aria-label="A floating cluster of pink ornaments with rose-gold fittings. Move your pointer through the ornaments or drag one to scatter them." />
+      <div ref={host} className="scene absolute inset-0" role="img" aria-label="A floating sculpture of glass, ceramic, and satin music tiles in coral, lilac, pearl, and midnight blue. Move through the shapes or drag one to explore." />
       <div className="grain pointer-events-none absolute inset-0" aria-hidden="true" />
       <div ref={cursor} className="scene-cursor pointer-events-none" aria-hidden="true"><span /></div>
 
       <header className="hero-header absolute inset-x-0 top-0 z-20 flex items-center justify-between">
         <button className="wordmark display-font" onClick={reset} aria-label="Festivity — reset the scene">FESTIVITY</button>
-        <div className="study-index hidden items-center justify-between md:flex" aria-label="A study of form, material, dynamics, collisions, and simulations">
-          <span>FORM</span><span>MATERIAL</span><span>DYNAMICS</span><span>COLLISIONS</span><span>SIMULATIONS</span>
+        <div className="study-index hidden items-center justify-between md:flex" aria-label="A study of sound, artists, connection, culture, and play">
+          <span>SOUND</span><span>ARTISTS</span><span>CONNECTION</span><span>CULTURE</span><span>PLAYGROUND</span>
         </div>
         <button ref={menuButton} className={`menu-button icon-button ${menuOpen ? 'is-open' : ''}`} aria-label={menuOpen ? 'Close experiment controls' : 'Open experiment controls'} aria-expanded={menuOpen} aria-controls="experiment-controls" onClick={() => setMenuOpen(open => !open)}>
           <span /><span /><span />
@@ -103,13 +103,13 @@ export default function App() {
         <p className="menu-eyebrow">EXPERIMENT 001</p>
         <button onClick={() => setPaused(value => !value)}><span>{paused ? 'Resume motion' : 'Pause motion'}</span><PauseIcon paused={paused} /></button>
         <button onClick={reset}><span>Reset composition</span><ResetIcon /></button>
-        <button onClick={scatter}><span>Scatter ornaments</span><span aria-hidden="true">↗</span></button>
+        <button onClick={scatter}><span>Scatter shapes</span><span aria-hidden="true">↗</span></button>
         <p className="menu-hint">Move to push. Hold to pull.<br />Let go and watch it settle.</p>
       </div>}
 
       <div className="study-caption absolute z-10 pointer-events-none">
-        <p className="font-semibold">Decoration Collisions</p>
-        <p>Research &amp; Development</p>
+        <p className="font-semibold">Where Sound Takes Shape</p>
+        <p>Artists &amp; Fans. Together.</p>
         <span className="caption-dash" />
       </div>
 
@@ -119,12 +119,12 @@ export default function App() {
         <span className={paused ? 'status-dot is-paused' : 'status-dot'} />
       </div>
 
-      <button className="large-x display-font absolute z-10" onClick={scatter} aria-label="Scatter the ornaments" title="Scatter the ornaments">X</button>
+      <button className="large-x display-font absolute z-10" onClick={scatter} aria-label="Scatter the shapes" title="Scatter the shapes">M</button>
       <div className="edition absolute z-10 flex items-center pointer-events-none" aria-label="Experiment 01"><span className="display-font">01</span><span className="edition-dash" /></div>
 
       <footer className="hero-footer absolute inset-x-0 bottom-0 z-20 flex items-end justify-between">
-        <div className="material-caption"><p className="font-semibold">Pink &amp; Rose Gold</p><p>Lighting &amp; Material Study</p></div>
-        <h1 className="hero-title display-font">DYNAMIC COLLISIONS</h1>
+        <div className="material-caption"><p className="font-semibold">Made to Move You</p><p>A Study in Sound &amp; Connection</p></div>
+        <h1 className="hero-title">MUSIC, IN MOTION</h1>
         <div className="simulation-controls flex items-center">
           <span className="simulation-label">{paused ? 'MOTION PAUSED' : 'LIVE SIMULATION'}</span>
           <button className="icon-button" onClick={() => setPaused(value => !value)} aria-label={paused ? 'Resume motion' : 'Pause motion'} title={paused ? 'Resume motion' : 'Pause motion'}><PauseIcon paused={paused} /></button>

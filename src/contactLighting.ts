@@ -1,104 +1,82 @@
 import * as THREE from 'three'
 
-const NEIGHBORS = 8
-
-/** Continuous sphere occlusion, evaluated on the material rather than on a pixel grid. */
-export function createContactLighting(count: number, geometry: THREE.BufferGeometry, material: THREE.MeshPhysicalMaterial) {
-  const indices = Float32Array.from({ length: count }, (_, i) => i)
-  geometry.setAttribute('ornamentIndex', new THREE.InstancedBufferAttribute(indices, 1))
-
-  const positions = new Float32Array(count * 4)
-  const neighbors = new Float32Array(count * NEIGHBORS * 4)
-  const nearestDistances = new Float32Array(NEIGHBORS)
-  const nearestIndices = new Int16Array(NEIGHBORS)
-  const texture = new THREE.DataTexture(neighbors, NEIGHBORS, count, THREE.RGBAFormat, THREE.FloatType)
+/** Smooth directional contact light, compressed to second-order coefficients per shape.
+ * All neighbors contribute continuously; there are no changing nearest-neighbor sets.
+ * The CPU does the small pairwise solve, leaving only three texture reads per vertex.
+ */
+export function createContactLighting(count: number) {
+  const spheres = new Float32Array(count * 4)
+  const coefficients = new Float32Array(count * 12)
+  const texture = new THREE.DataTexture(coefficients, count, 3, THREE.RGBAFormat, THREE.FloatType)
   texture.minFilter = THREE.NearestFilter
   texture.magFilter = THREE.NearestFilter
   texture.generateMipmaps = false
 
-  material.onBeforeCompile = shader => {
-    shader.uniforms.contactNeighbors = { value: texture }
-    shader.vertexShader = `
-      attribute float ornamentIndex;
-      varying float vOrnamentIndex;
-      varying vec3 vContactPosition;
-      varying vec3 vContactNormal;
-    ` + shader.vertexShader
-    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
-      #include <begin_vertex>
-      vOrnamentIndex = ornamentIndex;
-      vContactPosition = (instanceMatrix * vec4(transformed, 1.0)).xyz;
-      vContactNormal = mat3(instanceMatrix) * objectNormal;
-    `)
-    shader.fragmentShader = `
-      uniform sampler2D contactNeighbors;
-      varying float vOrnamentIndex;
-      varying vec3 vContactPosition;
-      varying vec3 vContactNormal;
-    ` + shader.fragmentShader
-    shader.fragmentShader = shader.fragmentShader.replace('#include <aomap_fragment>', `
-      #include <aomap_fragment>
-      vec3 contactNormal = normalize(vContactNormal);
-      float visibility = 1.0;
-      for (int neighborIndex = 0; neighborIndex < ${NEIGHBORS}; neighborIndex++) {
-        vec4 neighbor = texture2D(contactNeighbors, vec2(
-          (float(neighborIndex) + 0.5) / ${NEIGHBORS}.0,
-          (vOrnamentIndex + 0.5) / ${count}.0
-        ));
-        vec3 toNeighbor = neighbor.xyz - vContactPosition;
-        float radiusSquared = neighbor.w * neighbor.w;
-        float distanceSquared = max(dot(toNeighbor, toNeighbor), radiusSquared + 0.0001);
-        float facing = max(dot(contactNormal, toNeighbor) * inversesqrt(distanceSquared), 0.0);
-        float coverage = facing * radiusSquared / distanceSquared;
-        visibility *= 1.0 - min(coverage * 0.88, 0.94);
-      }
-      // A soft rose bounce in the crevices; reflections retain their brightness.
-      vec3 contactTint = mix(vec3(0.86, 0.48, 0.51), vec3(1.0), visibility);
-      reflectedLight.indirectDiffuse *= contactTint;
-      reflectedLight.directDiffuse *= mix(vec3(1.0), contactTint, 0.72);
-    `)
+  const apply = (material: THREE.MeshPhysicalMaterial) => {
+    material.onBeforeCompile = shader => {
+      shader.uniforms.contactCoefficients = { value: texture }
+      shader.vertexShader = `
+        attribute float shapeIndex;
+        uniform sampler2D contactCoefficients;
+        varying float vContactVisibility;
+      ` + shader.vertexShader
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
+        #include <begin_vertex>
+        vec3 contactNormal = normalize(mat3(modelMatrix) * objectNormal);
+        float contactU = (shapeIndex + 0.5) / ${count}.0;
+        vec4 c0 = texture2D(contactCoefficients, vec2(contactU, 0.1666667));
+        vec4 c1 = texture2D(contactCoefficients, vec2(contactU, 0.5));
+        vec4 c2 = texture2D(contactCoefficients, vec2(contactU, 0.8333333));
+        vec3 n = contactNormal;
+        float coverage = c0.x + dot(c0.yzw, n) + dot(c1.xyz, n * n)
+          + 2.0 * (c1.w * n.x * n.y + c2.x * n.x * n.z + c2.y * n.y * n.z);
+        vContactVisibility = exp(-max(coverage, 0.0));
+      `)
+      shader.fragmentShader = 'varying float vContactVisibility;\n' + shader.fragmentShader
+      shader.fragmentShader = shader.fragmentShader.replace('#include <aomap_fragment>', `
+        #include <aomap_fragment>
+        vec3 contactTint = mix(vec3(0.58, 0.49, 0.66), vec3(1.0), vContactVisibility);
+        reflectedLight.indirectDiffuse *= contactTint;
+        reflectedLight.directDiffuse *= mix(vec3(1.0), contactTint, 0.65);
+      `)
+    }
+    material.customProgramCacheKey = () => 'sculpture-directional-contact-v1'
   }
-  material.customProgramCacheKey = () => 'ornament-contact-lighting-v1'
 
   return {
+    apply,
     setSphere(index: number, position: THREE.Vector3, radius: number) {
       const offset = index * 4
-      positions[offset] = position.x
-      positions[offset + 1] = position.y
-      positions[offset + 2] = position.z
-      positions[offset + 3] = radius
+      spheres[offset] = position.x
+      spheres[offset + 1] = position.y
+      spheres[offset + 2] = position.z
+      spheres[offset + 3] = radius
     },
     update() {
-      // Reuse all buffers. Only eight closest occluders are sampled per fragment.
+      coefficients.fill(0)
       for (let i = 0; i < count; i++) {
-        const offset = i * 4
-        nearestDistances.fill(Infinity)
-        nearestIndices.fill(-1)
+        const a = i * 4, b = a + count * 4, c = b + count * 4
         for (let j = 0; j < count; j++) {
           if (i === j) continue
-          const other = j * 4
-          const dx = positions[other] - positions[offset]
-          const dy = positions[other + 1] - positions[offset + 1]
-          const dz = positions[other + 2] - positions[offset + 2]
-          const combinedRadius = positions[other + 3] + positions[offset + 3]
-          const distance = (dx * dx + dy * dy + dz * dz) / (combinedRadius * combinedRadius)
-          if (distance >= nearestDistances[NEIGHBORS - 1]) continue
-          let slot = NEIGHBORS - 1
-          while (slot > 0 && distance < nearestDistances[slot - 1]) {
-            nearestDistances[slot] = nearestDistances[slot - 1]
-            nearestIndices[slot] = nearestIndices[slot - 1]
-            slot--
-          }
-          nearestDistances[slot] = distance
-          nearestIndices[slot] = j
-        }
-        for (let n = 0; n < NEIGHBORS; n++) {
-          const target = (i * NEIGHBORS + n) * 4
-          const source = nearestIndices[n] * 4
-          neighbors[target] = positions[source]
-          neighbors[target + 1] = positions[source + 1]
-          neighbors[target + 2] = positions[source + 2]
-          neighbors[target + 3] = positions[source + 3]
+          const k = j * 4
+          let x = spheres[k] - spheres[a], y = spheres[k + 1] - spheres[a + 1], z = spheres[k + 2] - spheres[a + 2]
+          const distance2 = x * x + y * y + z * z
+          if (distance2 < .00001) continue
+          const inverseDistance = 1 / Math.sqrt(distance2)
+          x *= inverseDistance; y *= inverseDistance; z *= inverseDistance
+          const radius2 = spheres[k + 3] ** 2
+          const fade = THREE.MathUtils.smoothstep(distance2 / radius2, 4, 30)
+          const weight = Math.min(1.4, radius2 / Math.max(radius2, distance2 - spheres[a + 3] ** 2 * .65) * 2.8) * (1 - fade) * .25
+          coefficients[a] += weight
+          coefficients[a + 1] += 2 * weight * x
+          coefficients[a + 2] += 2 * weight * y
+          coefficients[a + 3] += 2 * weight * z
+          coefficients[b] += weight * x * x
+          coefficients[b + 1] += weight * y * y
+          coefficients[b + 2] += weight * z * z
+          coefficients[b + 3] += weight * x * y
+          coefficients[c] += weight * x * z
+          coefficients[c + 1] += weight * y * z
         }
       }
       texture.needsUpdate = true

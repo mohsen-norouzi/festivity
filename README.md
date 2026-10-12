@@ -1,6 +1,6 @@
-# Festivity
+# Festivity — Music, in Motion
 
-A local, single-hero experiment inspired by the supplied ornament-collision video. Full-browser pale background, pink ornaments, rose-gold fittings, sparse typography, and interactive physical motion. No additional pages, backend, or deployment.
+A local, single-hero React and Three.js experiment. A floating sculpture of rounded music tiles, capsules, rings, and small satellites. Coral ceramic, lilac, pearl, dark satin, and refractive glass sit against a warm-to-cool studio backdrop. No extra pages or deployment.
 
 ## Run
 
@@ -10,7 +10,7 @@ bun install
 bun run dev
 ```
 
-Open the Local URL printed by Vite (normally http://127.0.0.1:5173).
+Open the Local URL printed by Vite, normally http://127.0.0.1:5173.
 
 ```sh
 bun run build
@@ -19,21 +19,20 @@ bun run preview
 
 ## Interactions
 
-- Move through the cloud to push the ornaments.
-- Press and drag an ornament to pull it out of the cluster.
-- Release it and let the attraction and collisions settle the composition.
-- Click **X** to scatter the cloud.
-- Use the footer or menu to pause, resume, or reset.
-- Touch and drag works on phones. The initial motion respects reduced-motion preferences.
+- Move through the sculpture to push the shapes.
+- Hold and drag a piece; release it to let it settle.
+- Click **M** to scatter the composition.
+- Pause, resume, and reset from the footer or menu.
+- Touch dragging and reduced-motion preferences are supported.
 
-## Structure
+## Rendering
 
-- `src/scene.ts` — Three.js rendering, procedural geometry, studio lighting, contact shading, fixed-step sphere collisions, and pointer interaction.
-- `src/contactLighting.ts` — continuous contact lighting using each sphere's eight nearest neighbors, without screen-space shadow artifacts.
-- `src/App.tsx` — React hero and accessible controls.
-- `src/style.css` — Tailwind import, responsive layout, typography, and cursor.
-- `public/fonts` — locally served Anton and Inter with their open-font licenses.
+- `src/scene.ts`: 34 physical bodies, fixed 90 Hz simulation, interpolated motion, smooth superellipsoid geometry with analytic normals, and physical materials.
+- `src/musicIcons.ts`: extruded procedural music symbols. Icons render after transmission to avoid ghosted refraction.
+- `src/studio.ts`: a baked studio environment, feathered softboxes, and a procedural gradient backdrop.
+- `src/contactLighting.ts`: all-neighbor contact lighting compressed into directional coefficients, with three texture samples per vertex and no nearest-neighbor switching.
+- `src/App.tsx` and `src/style.css`: accessible controls and responsive hero layout.
 
-React + TypeScript + Vite + Bun + Tailwind CSS + Three.js. The entire ornament scene uses four instanced draw calls and a single rendering pass. Smooth 64 × 48 sphere geometry, native MSAA, and 1.5–2× render resolution keep edges clean, with a five-million-pixel budget for larger displays. Continuous contact lighting replaces the former low-resolution GTAO and blur passes. Physics uses a fixed 90 Hz step with interpolation. Paused scenes stop rendering, and hidden tabs suspend their simulation. All visual assets are procedural; no external image or model service is needed at runtime.
+Native MSAA and 1.5–2× rendering preserve edges within a five-million-pixel budget. The glass refraction buffer uses 35% of the render resolution; rough refraction conceals the reduced resolution while keeping the sculpture sharp. Small satellites use lighter geometry. Paused scenes stop rendering; hidden tabs suspend simulation. All assets are local or procedural.
 
-This is a visual experiment, not a final music-platform identity. The frame-by-frame shape differs from the video because the scene is a live simulation.
+React + TypeScript + Vite + Bun + Tailwind CSS + Three.js. Festivity is an experiment name, not the final platform identity.
