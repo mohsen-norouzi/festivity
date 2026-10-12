@@ -1,12 +1,26 @@
 import * as THREE from 'three'
-import { createWirePhysics, WIRE_RADIUS } from './wirePhysics'
+import { createWirePhysics, WIRE_RADIUS, type WireBody } from './wirePhysics'
+import { createBubblePhysics, type BubbleInteraction } from './bubblePhysics'
 
 export function createOrbits(parent: THREE.Group) {
   const group = new THREE.Group()
-  const bubbleGroup = new THREE.Group()
-  group.add(bubbleGroup)
   parent.add(group)
   const wire = createWirePhysics()
+  const bubblePhysics = createBubblePhysics()
+  const colliders: WireBody[] = []
+  let contactBodies: readonly WireBody[] = []
+  let contactSettling = false
+  const solveBubbleContacts = () => bubblePhysics.solveContacts(contactBodies, contactSettling)
+  const step = (dt: number, cubes: readonly WireBody[], time: number, settling = false, interaction?: BubbleInteraction) => {
+    contactBodies = cubes
+    contactSettling = settling
+    // Reuse the collision list and callback; no per-frame allocations.
+    colliders.length = 0
+    for (const cube of cubes) colliders.push(cube)
+    for (const bubble of bubblePhysics.bodies) colliders.push(bubble)
+    bubblePhysics.beginStep(dt, cubes, time, settling, parent.quaternion, interaction)
+    wire.step(dt, colliders, time, settling, solveBubbleContacts)
+  }
   const renderNodes = wire.positions.map(position => position.clone())
   const curve = new THREE.CatmullRomCurve3(renderNodes, true, 'centripetal')
   const segments = wire.positions.length * 2
@@ -40,12 +54,12 @@ export function createOrbits(parent: THREE.Group) {
 
   const bubbleGeometry = new THREE.SphereGeometry(1, 32, 24)
   const bubbleMaterial = new THREE.MeshPhysicalMaterial({ color: '#f7efff', roughness: .065, metalness: 0, transmission: .92, thickness: .3, ior: 1.34, iridescence: .8, iridescenceIOR: 1.3, iridescenceThicknessRange: [100, 410], clearcoat: 1, clearcoatRoughness: .08, envMapIntensity: 1.8, dithering: true })
-  const bubbles = new THREE.InstancedMesh(bubbleGeometry, bubbleMaterial, 5)
-  bubbleGroup.add(bubbles)
+  const bubbles = new THREE.InstancedMesh(bubbleGeometry, bubbleMaterial, bubblePhysics.bodies.length)
+  bubbles.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+  bubbles.frustumCulled = false
+  group.add(bubbles)
   const dummy = new THREE.Object3D()
-  const bubblePositions = [new THREE.Vector3(-3.65, 1.2, 1.4), new THREE.Vector3(3.45, 1.2, 1.7), new THREE.Vector3(-4.05, -1.15, 1.3), new THREE.Vector3(2.4, 2.8, -.8), new THREE.Vector3(.15, -2.65, 2.3)]
-  const sizes = [.23, .2, .27, .14, .115]
-  const update = (time: number, alpha = 1) => {
+  const update = (alpha = 1) => {
     renderNodes.forEach((point, i) => point.lerpVectors(wire.previous[i], wire.positions[i], alpha))
     for (let i = 0; i < segments; i++) curve.getPoint(i / segments, centers[i])
     centers[segments].copy(centers[0])
@@ -79,16 +93,17 @@ export function createOrbits(parent: THREE.Group) {
     }
     positionAttribute.needsUpdate = true
     normalAttribute.needsUpdate = true
-    bubbleGroup.rotation.z = -.17 + Math.sin(time * .15) * .025
-    bubblePositions.forEach((position, i) => {
-      dummy.position.copy(position)
-      dummy.position.y += Math.sin(time * .4 + i * 1.6) * .1
-      dummy.scale.setScalar(sizes[i])
+    bubblePhysics.bodies.forEach((body, i) => {
+      dummy.position.lerpVectors(body.previous, body.position, alpha)
+      dummy.scale.setScalar(body.radius)
       dummy.updateMatrix()
       bubbles.setMatrixAt(i, dummy.matrix)
     })
     bubbles.instanceMatrix.needsUpdate = true
+    bubbles.computeBoundingSphere()
   }
-  update(0)
-  return { wire, update, dispose() { geometry.dispose(); material.dispose(); bubbleGeometry.dispose(); bubbleMaterial.dispose(); bubbles.dispose(); parent.remove(group) } }
+  update()
+  const reset = () => { wire.reset(); bubblePhysics.reset() }
+  const rest = () => { wire.rest(); bubblePhysics.rest() }
+  return { wire, bubbleMesh: bubbles, bubbleBodies: bubblePhysics.bodies, step, reset, rest, update, dispose() { geometry.dispose(); material.dispose(); bubbleGeometry.dispose(); bubbleMaterial.dispose(); bubbles.dispose(); parent.remove(group) } }
 }

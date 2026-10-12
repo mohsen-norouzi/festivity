@@ -9,6 +9,7 @@ export interface WireBody {
   shapePower: number
   mass: number
   radius: number
+  isSphere?: boolean
 }
 
 export const WIRE_RADIUS = .013
@@ -36,6 +37,7 @@ export function createWirePhysics(count = 96) {
   const torque = new THREE.Vector3()
   const lever = new THREE.Vector3()
   const midpoint = new THREE.Vector3()
+  const segment = new THREE.Vector3()
   const inverse = new THREE.Quaternion()
   const inverses: THREE.Quaternion[] = []
   const candidates = Array.from({ length: count }, () => [] as number[])
@@ -55,6 +57,8 @@ export function createWirePhysics(count = 96) {
     for (let candidate = 0; candidate < nearby.length; candidate++) {
       const index = nearby[candidate]
       const body = bodies[index]
+      // Sphere contacts use the closest point on the entire cable segment below.
+      if (body.isSphere) continue
       delta.subVectors(point, body.position)
       if (delta.lengthSq() > (body.radius + CLEARANCE * 2) ** 2) continue
       local.copy(delta).applyQuaternion(inverses[index])
@@ -98,7 +102,46 @@ export function createWirePhysics(count = 96) {
     }
   }
 
-  const step = (dt: number, bodies: readonly WireBody[], time: number, settling = false) => {
+  const collideSpheres = (first: number, second: number, bodies: readonly WireBody[], dt: number, settling: boolean) => {
+    for (const index of candidates[first]) {
+      const body = bodies[index]
+      if (!body.isSphere) continue
+      segment.subVectors(positions[second], positions[first])
+      const lengthSq = segment.lengthSq()
+      const t = lengthSq > 1e-10 ? THREE.MathUtils.clamp(delta.subVectors(body.position, positions[first]).dot(segment) / lengthSq, 0, 1) : 0
+      midpoint.copy(positions[first]).addScaledVector(segment, t)
+      normal.subVectors(midpoint, body.position)
+      const distance = normal.length(), minimum = body.radius + CLEARANCE
+      if (distance >= minimum) continue
+      if (distance < 1e-6) {
+        normal.set(-segment.y, segment.x, 0)
+        if (normal.lengthSq() < 1e-10) normal.set(1, 0, 0)
+        normal.normalize()
+      } else normal.multiplyScalar(1 / distance)
+      const firstWeight = 1 - t, secondWeight = t
+      const wireInverseMass = (firstWeight ** 2 + secondWeight ** 2) / NODE_MASS
+      const bubbleInverseMass = 1 / body.mass
+      const correction = (minimum - distance) / (wireInverseMass + bubbleInverseMass)
+      positions[first].addScaledVector(normal, correction * firstWeight / NODE_MASS)
+      positions[second].addScaledVector(normal, correction * secondWeight / NODE_MASS)
+      body.position.addScaledVector(normal, -correction * bubbleInverseMass)
+      if (!settling) {
+        delta.copy(velocities[first]).multiplyScalar(firstWeight).addScaledVector(velocities[second], secondWeight).sub(body.velocity)
+        const closing = delta.dot(normal)
+        if (closing < 0) {
+          const impulse = -closing * 1.08 / (wireInverseMass + bubbleInverseMass)
+          velocities[first].addScaledVector(normal, impulse * firstWeight / NODE_MASS)
+          velocities[second].addScaledVector(normal, impulse * secondWeight / NODE_MASS)
+          body.velocity.addScaledVector(normal, -impulse * bubbleInverseMass)
+        }
+        // Transfer some positional contact motion, including a slowly stretching cable.
+        body.velocity.addScaledVector(normal, -Math.min(.3, correction * bubbleInverseMass / dt * .12))
+      }
+      contacts++
+    }
+  }
+
+  const step = (dt: number, bodies: readonly WireBody[], time: number, settling = false, resolveBodies?: () => void) => {
     contacts = 0
     bodies.forEach((body, i) => {
       if (!inverses[i]) inverses[i] = new THREE.Quaternion()
@@ -130,6 +173,7 @@ export function createWirePhysics(count = 96) {
       }
     }
     for (let iteration = 0; iteration < 6; iteration++) {
+      resolveBodies?.()
       if (iteration === 0 || iteration === 3) refreshCandidates()
       // Alternate traversal avoids accumulating a twist in one direction.
       for (let n = 0; n < count; n++) {
@@ -138,6 +182,7 @@ export function createWirePhysics(count = 96) {
         constrain(i, (i + 2) % count, bendLengths[i], .065)
       }
       for (let i = 0; i < count; i++) collide(positions[i], i, -1, bodies, dt, settling)
+      for (let i = 0; i < count; i++) collideSpheres(i, (i + 1) % count, bodies, dt, settling)
       if (iteration === 5) {
         // Segment contacts prevent a thin cable from cutting corners between nodes.
         for (let i = 0; i < count; i++) {
@@ -147,6 +192,15 @@ export function createWirePhysics(count = 96) {
         }
         for (let i = 0; i < count; i++) collide(positions[i], i, -1, bodies, dt, settling)
       }
+    }
+    // Alternate the two contact sets so a bubble caught between a cube and the
+    // cable cannot be pushed into the other collider by the last solver pass.
+    if (resolveBodies) {
+      for (let pass = 0; pass < 3; pass++) {
+        resolveBodies()
+        for (let i = 0; i < count; i++) collideSpheres(i, (i + 1) % count, bodies, dt, settling)
+      }
+      resolveBodies()
     }
     for (let i = 0; i < count; i++) velocities[i].subVectors(positions[i], previous[i]).multiplyScalar(1 / dt).clampLength(0, 12)
   }

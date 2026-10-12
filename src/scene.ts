@@ -172,6 +172,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const smoothPointer = new THREE.Vector3(100, 100, 1.4)
   const lastPointer = new THREE.Vector3(100, 100, 1.4)
   const pointerVelocity = new THREE.Vector3()
+  const bubbleInteraction = { hover: false, dragging: -1, pointer: smoothPointer, dragTarget: pointerWorld, velocity: pointerVelocity }
   const cursorPosition = new THREE.Vector2(-100, -100)
   const cursorTarget = new THREE.Vector2(-100, -100)
   let active = false
@@ -231,6 +232,10 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       body.rotation.copy(body.rest)
     })
   }
+
+  // The glass spheres participate in the same raycast and drag path as the tiles.
+  const interactiveMeshes = [...meshes, orbits.bubbleMesh]
+  const interactiveBodies = [...bodies, ...orbits.bubbleBodies]
 
   const step = (dt: number, settling = false) => {
     elapsed += settling ? 0 : dt
@@ -308,11 +313,13 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         body.rotation.slerp(body.rest, 1 - Math.exp(-.45 * dt))
       }
     }
-    orbits.wire.step(dt, bodies, elapsed, settling)
+    bubbleInteraction.hover = active && dragging < 0
+    bubbleInteraction.dragging = dragging >= COUNT ? dragging - COUNT : -1
+    orbits.step(dt, bodies, elapsed, settling, bubbleInteraction)
   }
 
   const updateInstances = (alpha = 1) => {
-    orbits.update(elapsed, alpha)
+    orbits.update(alpha)
     cluster.rotation.y = Math.sin(elapsed * .14) * .025
     cluster.rotation.z = Math.sin(elapsed * .2) * .014
     cluster.updateMatrixWorld(true)
@@ -331,10 +338,10 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     cursor.classList.remove('is-dragging')
     elapsed = 0
     fillBodies()
-    orbits.wire.reset()
+    orbits.reset()
     for (let i = 0; i < 240; i++) step(STEP, true)
     for (const body of bodies) { body.velocity.set(0, 0, 0); body.previous.copy(body.position) }
-    orbits.wire.rest()
+    orbits.rest()
     updateInstances()
     needsRender = true
   }
@@ -396,10 +403,10 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     projectPointer(event)
     if (paused) return
     raycaster.setFromCamera(pointer, camera)
-    const hit = raycaster.intersectObjects(meshes, false)[0]
+    const hit = raycaster.intersectObjects(interactiveMeshes, false)[0]
     if (hit) {
-      dragging = hit.object.userData.bodyIndex as number
-      dragDepth = bodies[dragging].position.z + .2
+      dragging = hit.object === orbits.bubbleMesh ? COUNT + hit.instanceId! : hit.object.userData.bodyIndex as number
+      dragDepth = interactiveBodies[dragging].position.z + .2
     }
     pointerId = event.pointerId
     host.setPointerCapture(event.pointerId)
