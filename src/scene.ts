@@ -1,11 +1,12 @@
 import * as THREE from 'three'
-import { makeMusicIcons, type MusicIcon } from './musicIcons'
+import { createMusicIcons, type MusicIcon } from './musicIcons'
 import { createStudio } from './studio'
 import { createOrbits } from './orbits'
 import { createContactLighting } from './contactLighting'
 import { createBurstLifecycle } from './burstLifecycle'
 import { createBurstEffects } from './burstEffects'
 import { createBurstAudio } from './burstAudio'
+import { createEntrance, shuffledIndices } from './entrance'
 
 export interface OrnamentScene {
   dispose: () => void
@@ -33,7 +34,7 @@ interface Body {
 }
 
 type Finish = 'ink' | 'coral' | 'lilac' | 'pearl' | 'glass' | 'blue'
-type Form = 'tile' | 'capsule' | 'ring' | 'disc'
+type Form = 'tile' | 'capsule'
 interface Piece { p: [number, number, number]; r: number; finish: Finish; icon?: MusicIcon; lettering?: boolean; form?: Form; tilt?: [number, number, number] }
 const pieces: Piece[] = [
   { p: [-.46, .22, 2.8], r: 1.38, finish: 'glass', icon: 'wave', tilt: [.12, -.22, .24] },
@@ -78,6 +79,7 @@ function randomGenerator(seed: number) {
 
 /** A small fixed-step sphere solver: attractive force, contact impulses, and drag springs. */
 export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement, onReady: () => void, onError: () => void): OrnamentScene {
+  const startedAt = performance.now()
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' })
   renderer.setClearColor(0x000000, 0)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -129,7 +131,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   letterTexture.colorSpace = THREE.SRGBColorSpace
   letterTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
   const letterMaterial = new THREE.MeshBasicMaterial({ map: letterTexture, transparent: true, depthWrite: false, toneMapped: false })
-  const icons = makeMusicIcons()
+  const icons = createMusicIcons()
   // Evenly tessellated superellipsoids have continuous curvature across the face,
   // not just beveled corners. Analytic normals keep moving highlights smooth.
   const pillow = (width: number, height: number, depth: number, power: number, segments = 20) => {
@@ -150,10 +152,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const prototypes: Record<Form, THREE.BufferGeometry> = {
     tile: pillow(1.6, 1.6, 1.35, 3.8),
     capsule: pillow(1.48, 1.88, 1.32, 2.8),
-    ring: new THREE.TorusGeometry(.64, .26, 24, 64),
-    disc: new THREE.SphereGeometry(.8, 40, 24),
   }
-  prototypes.disc.scale(1, 1, .52)
   Object.values(prototypes).forEach(geometry => {
     geometry.computeBoundingSphere()
     const scale = 1 / geometry.boundingSphere!.radius
@@ -165,7 +164,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const satelliteScale = 1 / smallTile.boundingSphere!.radius
   smallTile.scale(satelliteScale, satelliteScale, satelliteScale)
   smallTile.computeBoundingBox()
-  const meshes: THREE.Mesh[] = []
+  const interactiveMeshes: THREE.Object3D[] = [orbits.bubbleMesh]
+  orbits.bubbleMesh.visible = false
   const geometries: THREE.BufferGeometry[] = []
   let random = randomGenerator(2017)
   const bodies: Body[] = []
@@ -196,25 +196,38 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   let previousTime = 0
   let accumulator = 0
   let hasRendered = false
+  let hasArrived = false
   let needsRender = true
   let mobile = false
   let frameCount = 0
   let sampleTime = 0
 
+  // Physics metadata is cheap; geometry copies, icon extrusions and GPU programs
+  // are prepared separately. Unprepared bodies cannot render or collide.
   pieces.forEach((piece, index) => {
+    const geometry = piece.r < .5 && !piece.form ? smallTile : prototypes[piece.form ?? 'tile']
+    const object = new THREE.Group()
+    object.visible = false
+    cluster.add(object)
+    const home = new THREE.Vector3(...piece.p)
+    if (index < 22) { home.x *= .94; home.y *= .9; home.z *= 1.1 }
+    const rest = new THREE.Quaternion().setFromEuler(new THREE.Euler(...(piece.tilt ?? [.2, .2, .2])))
+    bodies.push({ enabled: false, halfSize: geometry.boundingBox!.max.clone().multiplyScalar(piece.r), shapePower: piece.form === 'capsule' ? 2.8 : 3.8, home, rest, object, position: home.clone(), previous: home.clone(), velocity: new THREE.Vector3(), rotation: rest.clone(), spin: new THREE.Vector3(), radius: piece.r, mass: piece.r ** 3, phase: random() * Math.PI * 2 })
+  })
+
+  const preparePiece = (index: number) => {
+    const piece = pieces[index], object = bodies[index].object
     const geometry = (piece.r < .5 && !piece.form ? smallTile : prototypes[piece.form ?? 'tile']).clone()
     geometry.setAttribute('shapeIndex', new THREE.BufferAttribute(new Float32Array(geometry.getAttribute('position').count).fill(index), 1))
     geometries.push(geometry)
-    const object = new THREE.Group()
     const mesh = new THREE.Mesh(geometry, finishes[piece.finish])
     mesh.userData.bodyIndex = index
     object.add(mesh)
-    meshes.push(mesh)
+    interactiveMeshes.push(mesh)
     if (piece.icon) {
       const material = piece.finish === 'glass' ? glyphPrism : piece.finish === 'ink' ? glyphLilac : piece.finish === 'pearl' ? glyphDark : glyphLight
-      const glyphGeometry = icons[piece.icon].clone()
-      const glyph = new THREE.Mesh(glyphGeometry, material)
-      geometries.push(glyphGeometry)
+      // Share the immutable icon mesh data between tiles, and extrude on demand.
+      const glyph = new THREE.Mesh(icons.get(piece.icon), material)
       glyph.scale.setScalar(index === 0 ? 1.06 : .84)
       glyph.position.z = geometry.boundingBox!.max.z + .024
       object.add(glyph)
@@ -226,13 +239,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       lettering.position.z = geometry.boundingBox!.max.z + .012
       object.add(lettering)
     }
-    object.scale.setScalar(piece.r)
-    cluster.add(object)
-    const home = new THREE.Vector3(...piece.p)
-    if (index < 22) { home.x *= .94; home.y *= .9; home.z *= 1.1 }
-    const rest = new THREE.Quaternion().setFromEuler(new THREE.Euler(...(piece.tilt ?? [.2, .2, .2])))
-    bodies.push({ halfSize: geometry.boundingBox!.max.clone().multiplyScalar(piece.r), shapePower: piece.form === 'capsule' ? 2.8 : 3.8, home, rest, object, position: home.clone(), previous: home.clone(), velocity: new THREE.Vector3(), rotation: rest.clone(), spin: new THREE.Vector3(), radius: piece.r, mass: piece.r ** 3, phase: random() * Math.PI * 2 })
-  })
+  }
 
   const fillBodies = () => {
     random = randomGenerator(2017)
@@ -244,8 +251,12 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   }
 
   // The glass spheres participate in the same raycast and drag path as the tiles.
-  const interactiveMeshes = [...meshes, orbits.bubbleMesh]
   const interactiveBodies = [...bodies, ...orbits.bubbleBodies]
+  interactiveBodies.forEach(body => { body.enabled = false })
+  const entrance = createEntrance(interactiveBodies.length)
+  const arrivedAt = new Float64Array(interactiveBodies.length).fill(-Infinity)
+  const warmedFinishes = new Set<string>()
+  let wireReady = false, wireReveal = 0, settleFrames = 0
   const baseRadii = interactiveBodies.map(body => body.radius)
   const burstOrigin = new THREE.Vector3()
   const lifecycle = createBurstLifecycle(interactiveBodies, (index, body) => {
@@ -279,6 +290,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     body.position.copy(offset)
     if (index < COUNT) body.rotation.copy(bodies[index].rest)
   })
+  const renderBodyRadiusAt = (index: number) => lifecycle.scale(index, renderAlpha)
   const bubbleRadiusAt = (index: number) => lifecycle.scale(COUNT + index, renderAlpha)
   let renderAlpha = 1
 
@@ -318,7 +330,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
           body.spin.y += pointerVelocity.x * dt * .35
         }
       }
-      v.multiplyScalar(Math.exp(-(settling ? 3.2 : 1.75) * dt))
+      const entering = elapsed - arrivedAt[i] < 2.5
+      v.multiplyScalar(Math.exp(-(settling ? 3.2 : entering ? 2.9 : 1.75) * dt))
       v.clampLength(0, 13)
       p.addScaledVector(v, dt)
     }
@@ -392,13 +405,15 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     dragging = -1
     canPuff = false; feedbackIndex = -1
     lifecycle.reset(); burstEffects.reset(); burstAudio.stop()
+    entrance.replay()
+    interactiveBodies.forEach(body => { body.enabled = false })
+    wireReveal = 0; orbits.reveal(0)
     active = false
     cursor.classList.remove('is-dragging', 'is-charging')
     cursor.style.setProperty('--charge', '0')
     elapsed = 0
     fillBodies()
     orbits.reset()
-    for (let i = 0; i < 240; i++) step(STEP, true)
     for (const body of bodies) { body.velocity.set(0, 0, 0); body.previous.copy(body.position) }
     orbits.rest()
     updateInstances()
@@ -470,7 +485,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     raycaster.setFromCamera(pointer, camera)
     const hit = raycaster.intersectObjects(interactiveMeshes, false).find(candidate => {
       const index = candidate.object === orbits.bubbleMesh ? COUNT + candidate.instanceId! : candidate.object.userData.bodyIndex as number
-      return lifecycle.canGrab(index)
+      const finish = index < COUNT ? pieces[index].finish : 'bubble'
+      return entrance.hasEntered(index) && interactiveBodies[index].enabled !== false && warmedFinishes.has(finish) && lifecycle.canGrab(index)
     })
     dragging = -1; canPuff = false
     if (hit) {
@@ -526,10 +542,82 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   renderer.domElement.addEventListener('webglcontextlost', onContextLost)
   document.addEventListener('visibilitychange', onVisibility)
 
-  reset()
   resize()
-  // Include the hidden particle materials so the first pop does not compile shaders.
-  renderer.compile(scene, camera)
+
+  // This wait is cancellable, including while a background tab suspends its RAF.
+  let preparationFrame = 0
+  let resolveFrame: ((alive: boolean) => void) | undefined
+  const nextFrame = () => new Promise<boolean>(resolve => {
+    if (disposed) { resolve(false); return }
+    resolveFrame = resolve
+    preparationFrame = requestAnimationFrame(() => { resolveFrame = undefined; resolve(!disposed) })
+  })
+  const prepare = async () => {
+    if (!await nextFrame()) return
+    await renderer.compileAsync(orbits.wireMesh, camera, scene)
+    if (disposed) return
+    wireReady = true
+    const order = [...shuffledIndices(10), ...shuffledIndices(COUNT - 10).map(i => i + 10)]
+    // Interleave the little spheres instead of revealing the whole instance batch.
+    shuffledIndices(orbits.bubbleBodies.length).forEach((index, i) => order.splice(3 + i * 5, 0, COUNT + index))
+    let bubblesReady = false
+    for (const index of order) {
+      if (!await nextFrame()) return
+      if (index < COUNT) {
+        preparePiece(index)
+        await renderer.compileAsync(bodies[index].object, camera, scene)
+      } else if (!bubblesReady) {
+        await renderer.compileAsync(orbits.bubbleMesh, camera, scene)
+        bubblesReady = true
+      }
+      if (disposed) return
+      entrance.ready(index)
+      // Warm only the matching oil shader, after scheduling the ornament's arrival.
+      // By the time it can be clicked, its first pop is also ready to render.
+      const finish = index < COUNT ? pieces[index].finish : 'bubble'
+      if (!warmedFinishes.has(finish)) {
+        for (const object of burstEffects.warmupObjects(finish)) {
+          if (!await nextFrame()) return
+          await renderer.compileAsync(object, camera, scene)
+          if (disposed) return
+        }
+        warmedFinishes.add(finish)
+      }
+    }
+    if (import.meta.env.DEV) host.dataset.preparationMs = (performance.now() - startedAt).toFixed(0)
+  }
+
+  const launch = (index: number) => {
+    const body = interactiveBodies[index]
+    body.enabled = true
+    arrivedAt[index] = elapsed
+    if (paused) {
+      body.position.copy(body.home)
+      settleFrames = 24
+    } else {
+      // Choose a different approach on each visit, favoring the body's natural
+      // side so arrivals brush the sculpture rather than cutting through it.
+      const angle = Math.atan2(body.home.y, body.home.x || .01) + (Math.random() - .5) * 1.25
+      const x = Math.cos(angle), y = Math.sin(angle)
+      const distance = Math.min((camera.right + body.radius * cluster.scale.x * 2) / Math.max(.001, Math.abs(x)), (camera.top + body.radius * cluster.scale.x * 2) / Math.max(.001, Math.abs(y)))
+      offset.set(x * distance, y * distance, (body.home.z + (Math.random() - .5) * .8) * cluster.scale.x)
+      cluster.worldToLocal(offset)
+      body.position.copy(offset)
+      body.velocity.subVectors(body.home, body.position).normalize().multiplyScalar(2 + Math.random())
+      if (index < COUNT) {
+        quaternion.setFromEuler(new THREE.Euler((Math.random() - .5) * .8, (Math.random() - .5) * .8, (Math.random() - .5) * 1.2))
+        body.rotation.copy(bodies[index].rest).premultiply(quaternion)
+        body.spin.set((Math.random() - .5) * .5, (Math.random() - .5) * .5, (Math.random() - .5) * .6)
+      }
+    }
+    body.previous.copy(body.position)
+    if (index >= COUNT) orbits.bubbleMesh.visible = true
+    needsRender = true
+    if (!hasArrived) {
+      hasArrived = true
+      if (import.meta.env.DEV) host.dataset.firstArrivalMs = (performance.now() - startedAt).toFixed(0)
+    }
+  }
 
   const tick = (now: number) => {
     if (disposed) return
@@ -550,6 +638,24 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         frameCount = 0; sampleTime = now
       }
     }
+    entrance.step(dt, launch)
+    if (wireReady && entrance.entered > 0 && wireReveal < 1) {
+      wireReveal = paused ? 1 : Math.min(1, wireReveal + dt * .9)
+      orbits.reveal(wireReveal * wireReveal * (3 - 2 * wireReveal))
+      needsRender = true
+    }
+    if (paused && (needsRender || settleFrames > 0)) {
+      if (settleFrames > 0) { for (let i = 0; i < 4; i++) step(STEP, true); settleFrames-- }
+      orbits.rest()
+      bodies.forEach(body => body.previous.copy(body.position))
+      updateInstances()
+      needsRender = true
+    }
+    if (import.meta.env.DEV) {
+      host.dataset.prepared = String(entrance.prepared)
+      host.dataset.entered = String(entrance.entered)
+      host.dataset.entrance = entrance.complete ? 'complete' : 'arriving'
+    }
     cursorPosition.lerp(cursorTarget, 1 - Math.exp(-24 * dt))
     cursor.style.transform = `translate3d(${cursorPosition.x}px, ${cursorPosition.y}px, 0)`
     if (!paused) {
@@ -561,7 +667,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       while (accumulator >= STEP && steps++ < 6) { step(STEP); accumulator -= STEP }
       accumulator = Math.max(0, Math.min(accumulator, STEP))
       updateInstances(accumulator / STEP)
-      burstEffects.render(interactiveBodies, renderAlpha)
+      burstEffects.render(interactiveBodies, renderAlpha, renderBodyRadiusAt)
       const charge = feedbackIndex >= 0 ? lifecycle.states[feedbackIndex].charge : 0
       cursor.classList.toggle('is-charging', charge > 0 && now - feedbackTime < 1800)
       cursor.style.setProperty('--charge', String(charge))
@@ -580,16 +686,49 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       renderer.render(scene, camera)
       needsRender = false
     }
-    if (!hasRendered) { hasRendered = true; onReady() }
+    if (!hasRendered) {
+      hasRendered = true
+      if (import.meta.env.DEV) host.dataset.firstFrameMs = (performance.now() - startedAt).toFixed(0)
+      onReady()
+    }
   }
   raf = requestAnimationFrame(tick)
+  const preparation = prepare().catch(cause => {
+    if (!disposed) { console.error('Unable to prepare the sculpture', cause); onError() }
+  })
+  const releaseResources = () => {
+    geometries.forEach(geometry => geometry.dispose())
+    Object.values(prototypes).forEach(geometry => geometry.dispose())
+    smallTile.dispose(); icons.dispose()
+    Object.values(finishes).forEach(material => material.dispose())
+    glyphDark.dispose(); glyphLight.dispose(); glyphLilac.dispose(); glyphPrism.dispose()
+    letterMaterial.dispose(); letterTexture.dispose(); orbits.dispose(); studio.dispose()
+    contactLighting.dispose()
+    burstEffects.dispose(); burstAudio.dispose()
+    renderer.dispose()
+  }
 
   return {
     reset, scatter,
-    setPaused(value) { paused = value; accumulator = 0; needsRender = true; if (value) { onCancel(); burstAudio.stop() } },
+    setPaused(value) {
+      paused = value; accumulator = 0; needsRender = true
+      if (value) {
+        onCancel(); burstAudio.stop()
+        // Pausing / reduced motion completes arrivals in place, never off-screen.
+        interactiveBodies.forEach((body, index) => {
+          if (entrance.hasEntered(index) && elapsed - arrivedAt[index] < 5) {
+            body.position.copy(body.home); body.previous.copy(body.home); body.velocity.set(0, 0, 0)
+            if (index < COUNT) body.rotation.copy(bodies[index].rest)
+          }
+        })
+        settleFrames = 24
+      }
+    },
     setSoundEnabled(value) { burstAudio.setMuted(!value) },
     dispose() {
+      if (disposed) return
       disposed = true
+      burstAudio.stop()
       cancelAnimationFrame(raf)
       resizeObserver.disconnect()
       host.removeEventListener('pointermove', onMove)
@@ -600,16 +739,11 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       host.removeEventListener('pointerleave', onLeave)
       document.removeEventListener('visibilitychange', onVisibility)
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost)
-      geometries.forEach(geometry => geometry.dispose())
-      Object.values(prototypes).forEach(geometry => geometry.dispose())
-      smallTile.dispose()
-      Object.values(icons).forEach(geometry => geometry.dispose())
-      Object.values(finishes).forEach(material => material.dispose())
-      glyphDark.dispose(); glyphLight.dispose(); glyphLilac.dispose(); glyphPrism.dispose()
-      letterMaterial.dispose(); letterTexture.dispose(); orbits.dispose(); studio.dispose()
-      contactLighting.dispose()
-      burstEffects.dispose(); burstAudio.dispose()
-      renderer.dispose()
+      cancelAnimationFrame(preparationFrame)
+      resolveFrame?.(false)
+      // Three's async shader poll owns these materials until it resolves. Keep
+      // them alive through teardown to avoid an isReady/disposed-program race.
+      void preparation.finally(releaseResources)
       renderer.domElement.remove()
       cursor.classList.remove('visible', 'is-dragging')
     },

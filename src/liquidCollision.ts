@@ -39,7 +39,7 @@ export function createLiquidContacts() {
       state.previousInverse.copy(state.rotation).invert()
     })
   }
-  const sweep = (from: THREE.Vector3, to: THREE.Vector3, radius: number, ignoreBody = -1, moving = true) => {
+  const sweep = (from: THREE.Vector3, to: THREE.Vector3, radius: number, ignoreBody = -1, moving = true, skipDeparting = false) => {
     hit.index = -1; hit.time = 1
     for (let i = 0; i < bodies.length; i++) {
       const body = bodies[i], state = history[i]
@@ -67,7 +67,11 @@ export function createLiquidContacts() {
         return Math.sign(x) * Math.abs(x) ** (power - 1) * travel.x + Math.sign(y) * Math.abs(y) ** (power - 1) * travel.y + Math.sign(z) * Math.abs(z) ** (power - 1) * travel.z
       }
       let entry = 0
-      if (level(0) > 1) {
+      const startLevel = level(0)
+      // A drop can start inside the conservative contact envelope while already
+      // pulling away. That is separation, not a fresh impact or adhesive force.
+      if (skipDeparting && startLevel <= 1 && derivative(0) >= 0) continue
+      if (startLevel > 1) {
         // A convex field has one minimum along the segment. Check the whole sweep,
         // even when both endpoints lie outside a thin or fast-moving cube.
         if (derivative(0) >= 0) continue

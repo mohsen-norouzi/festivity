@@ -6,6 +6,7 @@ export const oilVertex = `
   attribute vec3 surfaceAnchor;
   attribute vec3 surfaceShape;
   varying vec2 vFragmentFinish;
+  varying float vLiquidThickness;
   vec3 liquidNormal(vec3 p, vec3 halfSize, float power) {
     return normalize(sign(p) * pow(max(abs(p / halfSize), vec3(0.00001)), vec3(power - 1.0)) / halfSize);
   }
@@ -68,7 +69,9 @@ export const oilVertex = `
     vec3 reference = abs(n.y) > 0.95 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
     vec3 baseT = normalize(cross(reference, n)), baseB = cross(n, baseT);
     vec3 t = baseT * cos(oilMotion.w) + baseB * sin(oilMotion.w);
-    vec3 b = cross(n, t);
+    // Sphere coordinates map to (tangent, normal, bitangent). Keep that frame
+    // right-handed so the visible wet cap retains the sphere's outward winding.
+    vec3 b = cross(t, n);
     float angle = atan(sphere.z, sphere.x);
     float edge = 1.0 + 0.035 * sin(angle * 3.0 + oilMotion.x + oilMotion.y * 1.1) + 0.02 * cos(angle * 5.0 - oilMotion.y * 0.7);
     vec3 p = anchor + t * sphere.x * liquidState.x * edge + b * sphere.z * liquidState.y * edge;
@@ -76,6 +79,9 @@ export const oilVertex = `
     p /= pow(q.x + q.y + q.z, 1.0 / liquidState.w);
     n = liquidNormal(p, surfaceShape, liquidState.w);
     resultNormal = normalize(t * sphere.x / liquidState.x + b * sphere.z / liquidState.y + n * sphere.y / liquidState.z);
-    return p + n * (sphere.y + 0.035) * liquidState.z;
+    // The lower hemisphere becomes the underside of a wet cap, entirely above
+    // the host. The old signed height buried half the liquid inside the cube.
+    if (sphere.y < 0.0) resultNormal = -n;
+    return p + n * (0.002 + max(0.0, sphere.y) * liquidState.z);
   }
 `

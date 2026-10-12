@@ -39,12 +39,15 @@ export function createBurstEffects(parent: THREE.Group, finishes: Record<string,
     material.onBeforeCompile = shader => {
       shader.vertexShader = oilVertex + shader.vertexShader
       shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', 'vec3 objectNormal; vec3 liquidPosition = liquidVertexPosition(position, objectNormal);')
-      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', 'vec3 transformed = liquidPosition; vFragmentFinish = fragmentFinish;')
-      shader.fragmentShader = 'varying vec2 vFragmentFinish;\n' + shader.fragmentShader
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', 'vec3 transformed = liquidPosition; vFragmentFinish = fragmentFinish; vLiquidThickness = liquidState.w > 0.5 ? liquidState.z : (liquidState.w < -0.5 ? max(liquidState.x, liquidState.y) * 1.6 : length(instanceMatrix[0].xyz) * 1.6);')
+      shader.fragmentShader = 'varying vec2 vFragmentFinish;\nvarying float vLiquidThickness;\n' + shader.fragmentShader
+      // Refraction follows the actual film height; a thin wet cap is not a deep
+      // lens sampling dark geometry from behind its host.
+      shader.fragmentShader = shader.fragmentShader.replace('#include <transmission_fragment>', THREE.ShaderChunk.transmission_fragment.replace('material.thickness = thickness;', 'material.thickness = min(thickness, vLiquidThickness);'))
       shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor * vFragmentFinish.x, 0.055, 0.85);')
       shader.fragmentShader = shader.fragmentShader.replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = clamp(metalnessFactor + vFragmentFinish.y, 0.0, 0.6);')
     }
-    material.customProgramCacheKey = () => 'flowing-oil-lobes-v2'
+    material.customProgramCacheKey = () => 'flowing-oil-lobes-v5'
     const mesh = new THREE.InstancedMesh(geometry, material, capacity)
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
     mesh.setColorAt(0, new THREE.Color('#ffffff'))
@@ -107,7 +110,7 @@ export function createBurstEffects(parent: THREE.Group, finishes: Record<string,
     gravity.set(0, -7.8, 0).applyQuaternion(inverse.copy(parent.quaternion).invert()).divideScalar(parent.scale.x)
     dynamics.step(dt, gravity, bodies)
   }
-  const render = (bodies: readonly WireBody[] = [], alpha = 1) => {
+  const render = (bodies: readonly WireBody[] = [], alpha = 1, radiusAt?: (index: number) => number) => {
     if (!dynamics.active && activeFragments === 0 && !dust.visible) return
     batches.forEach(batch => { batch.count = 0 })
     let dustCount = 0
@@ -159,10 +162,11 @@ export function createBurstEffects(parent: THREE.Group, finishes: Record<string,
     for (const drop of dynamics.deposits) {
       if (!drop.alive) continue
       const body = bodies[drop.bodyIndex], batch = batches.get(drop.finish)!
+      const renderScale = radiusAt ? radiusAt(drop.bodyIndex) / body.radius : 1
       const previous = (body as WireBody & { previous?: THREE.Vector3 }).previous
       if (previous) dummy.position.lerpVectors(previous, body.position, alpha)
       else dummy.position.copy(body.position)
-      dummy.quaternion.copy(body.rotation); dummy.scale.setScalar(1); dummy.updateMatrix()
+      dummy.quaternion.copy(body.rotation); dummy.scale.setScalar(renderScale); dummy.updateMatrix()
       const spread = 1 + 1.35 * (1 - Math.exp(-drop.age * 6)) + Math.sin(drop.age * 8) * Math.exp(-drop.age * 2) * drop.impact * .35
       const width = Math.min(drop.size * spread, body.radius * .27)
       const height = drop.size * (.29 + .72 * Math.exp(-drop.age * 7))
@@ -196,6 +200,7 @@ export function createBurstEffects(parent: THREE.Group, finishes: Record<string,
   }
   const reset = () => { dynamics.reset(); activeFragments = activeNecks = 0; batches.forEach(batch => { batch.mesh.visible = false; batch.mesh.count = 0 }); dust.visible = false }
   return {
+    warmupObjects: (finish: string) => [batches.get(finish)!.mesh, dust],
     burst, step, render, reset,
     update(dt: number, bodies: readonly WireBody[] = [], alpha = 1) { step(dt, bodies); render(bodies, alpha) },
     get activeFragments() { return activeFragments }, get surfaceDrops() { return dynamics.surfaceCount },

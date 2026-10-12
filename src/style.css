@@ -63,11 +63,8 @@ svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width:
 .control-menu button { font-size: 12px; display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 11px 0; text-align: left; }
 .control-menu button:hover { color: #967061; }
 .menu-hint { font-size: 10px; line-height: 1.7; color: #68767d; margin: 18px 0 0; }
-.loading-state { font-size: 9px; letter-spacing: .16em; }
-.loading-dot { animation: loading 1s infinite; }
 .error-state { text-align: center; background: #edf3f5; font-size: 16px; line-height: 1.8; }
 .error-state span { font-size: 12px; color: #66747b; }
-@keyframes loading { 50% { opacity: .2; } }
 @keyframes menu-in { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 767px) {
   .hero { --edge: 23px; }
@@ -132,3 +129,21 @@ svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width:
 @media (max-width: 1100px) and (min-width: 768px) { .community-card { left: 20%; top: 20%; } .explore-card { right: 9%; top: 26%; } .together-card { left: 19%; bottom: 23%; } .floating-card { scale: .85; transform-origin: left center; } .explore-card { transform-origin: right center; } }
 @media (max-width: 767px) { .community-card { top: 28%; left: 12%; padding: 9px 13px 9px 9px; gap: 8px; } .floating-card p { font-size: 9px; } .avatar-pair span { width: 27px; height: 27px; } .avatar-pair img { width: 12px; height: 12px; } .explore-card { top: auto; bottom: 29%; right: 7%; padding: 10px 13px; gap: 9px; } .card-wave { width: 26px; height: 26px; } .card-action { width: 25px; height: 25px; font-size: 20px; } .together-card { display: none; } }
 @media (max-height: 650px) and (min-width: 768px) { .floating-card { scale: .8; } .community-card { top: 17%; } .together-card { bottom: 20%; } }
+
+/* The lightweight shell arrives before the WebGL module has finished loading. */
+.hero { background: radial-gradient(ellipse at 92% 0%, #b4a0bf 0, transparent 52%), radial-gradient(ellipse at 18% 90%, #bf8e9d 0, transparent 49%), linear-gradient(135deg, #343755, #686584 50%, #303750); }
+.scene { transition: opacity .45s ease; }
+.hero-header, .hero-footer { animation: shell-enter .85s cubic-bezier(.2,.7,.2,1) both; }
+.study-caption, .interaction-label { animation: shell-enter 1s .12s cubic-bezier(.2,.7,.2,1) both; }
+.large-x, .edition { animation: shell-enter 1.15s .2s cubic-bezier(.2,.7,.2,1) both; }
+.floating-card { animation: shell-enter 1.15s .35s cubic-bezier(.2,.7,.2,1) both, card-float 7s 1.5s ease-in-out infinite; }
+.explore-card { animation-delay: .5s, 2.5s; }
+.together-card { animation-delay: .65s, 3.5s; }
+.entrance-signal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 6px; height: 48px; opacity: .65; animation: shell-enter .5s ease both; }
+.entrance-signal i { width: 3px; height: 15px; border-radius: 3px; background: #fff0f7; animation: signal-breathe 1.1s ease-in-out infinite alternate; }
+.entrance-signal i:nth-child(2), .entrance-signal i:nth-child(4) { height: 28px; animation-delay: -.25s; }
+.entrance-signal i:nth-child(3) { height: 43px; animation-delay: -.5s; }
+@keyframes shell-enter { from { opacity: 0; translate: 0 10px; } to { opacity: 1; translate: 0 0; } }
+@keyframes signal-breathe { to { scale: 1 .5; opacity: .35; } }
+
+.is-paused .floating-card { animation-play-state: running, paused; }

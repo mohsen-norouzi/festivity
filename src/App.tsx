@@ -2,7 +2,6 @@ import waveIcon from './assets/icons/waveform.svg'
 import noteIcon from './assets/icons/music-notes-fill.svg'
 import heartIcon from './assets/icons/heart-fill.svg'
 import { useEffect, useRef, useState } from 'react'
-import { createOrnamentScene } from './scene'
 import type { OrnamentScene } from './scene'
 
 function PauseIcon({ paused }: { paused: boolean }) {
@@ -37,15 +36,38 @@ export default function App() {
   const [resetCount, setResetCount] = useState(0)
   const [soundEnabled, setSoundEnabled] = useState(true)
 
+  const preferences = useRef({ paused, soundEnabled })
+  preferences.current = { paused, soundEnabled }
+
   useEffect(() => {
-    if (!host.current || !cursor.current) return
-    try {
-      scene.current = createOrnamentScene(host.current, cursor.current, () => setReady(true), () => setError(true))
-    } catch (cause) {
-      console.error('Unable to initialize the music sculpture', cause)
-      setError(true)
+    let cancelled = false
+    let instance: OrnamentScene | null = null
+    // Let the small React shell paint before downloading / preparing Three.js.
+    // Cancelling the scheduled work also avoids StrictMode's duplicate GPU setup.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(async () => {
+        try {
+          const { createOrnamentScene } = await import('./scene')
+          if (cancelled || !host.current || !cursor.current) return
+          instance = createOrnamentScene(host.current, cursor.current,
+            () => { if (!cancelled) setReady(true) },
+            () => { if (!cancelled) setError(true) })
+          scene.current = instance
+          instance.setPaused(preferences.current.paused)
+          if (!preferences.current.soundEnabled) instance.setSoundEnabled(false)
+        } catch (cause) {
+          if (cancelled) return
+          console.error('Unable to initialize the music sculpture', cause)
+          setError(true)
+        }
+      })
+    })
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(frame)
+      instance?.dispose()
+      if (scene.current === instance) scene.current = null
     }
-    return () => { scene.current?.dispose(); scene.current = null }
   }, [])
 
   useEffect(() => { scene.current?.setPaused(paused) }, [paused])
@@ -162,7 +184,7 @@ export default function App() {
         </div>
       </footer>
 
-      {!ready && !error && <div className="loading-state pointer-events-none absolute inset-0 flex items-center justify-center"><span>SETTING THE SCENE<span className="loading-dot">.</span></span></div>}
+      {!ready && !error && <div className="entrance-signal pointer-events-none" role="status" aria-label="The sculpture is arriving"><i /><i /><i /><i /><i /></div>}
       {error && <div className="error-state absolute inset-0 z-10 flex items-center justify-center"><p>This experiment needs WebGL.<br /><span>Please enable hardware acceleration and reload.</span></p></div>}
       <span className="sr-only" role="status">{resetCount > 0 ? `Composition reset ${resetCount} ${resetCount === 1 ? 'time' : 'times'}.` : ''}</span>
     </main>

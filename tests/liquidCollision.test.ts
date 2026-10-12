@@ -64,3 +64,51 @@ test('a newborn fast drop deposits immediately instead of passing through on its
   expect(dynamics.surfaceCount).toBe(1)
   expect(dynamics.deposits.find(drop => drop.alive)!.position.x).toBeLessThan(0)
 })
+
+test('a departing drip is not recaptured by the conservative collision margin', () => {
+  const dynamics = createBurstDynamics(), tile = body(), particle = dynamics.slots[0].particles[0]
+  tile.halfSize.set(.6, .6, .6); tile.radius = 1
+  particle.alive = true; particle.lifetime = 3; particle.size = .04
+  particle.position.set(0, -.65, 0); particle.velocity.set(0, -.25, 0)
+  const gravity = new THREE.Vector3(0, -7.8, 0)
+  let previousY = particle.position.y
+  for (let i = 0; i < 180; i++) {
+    dynamics.step(1 / 90, gravity, [tile])
+    expect(particle.alive).toBe(true)
+    expect(dynamics.surfaceCount).toBe(0)
+    expect(particle.position.y).toBeLessThan(previousY)
+    previousY = particle.position.y
+  }
+})
+
+test('a real returning impact still attaches after a drop has cleared its host', () => {
+  const dynamics = createBurstDynamics(), tile = body(), particle = dynamics.slots[0].particles[0]
+  tile.halfSize.set(.6, .6, .6); tile.radius = 1
+  particle.alive = true; particle.lifetime = 3; particle.size = .04
+  particle.position.set(0, -.8, 0); particle.velocity.set(0, 2, 0)
+  for (let i = 0; i < 12; i++) dynamics.step(1 / 90, new THREE.Vector3(), [tile])
+  expect(particle.alive).toBe(false)
+  expect(dynamics.surfaceCount).toBe(1)
+  expect(dynamics.deposits.find(drop => drop.alive)!.position.y).toBeCloseTo(-.6)
+})
+
+test('a snagged strand tears without teleporting either falling lobe onto the obstacle', () => {
+  const dynamics = createBurstDynamics(), tile = body()
+  tile.halfSize.set(.6, .6, .6); tile.radius = 1
+  const [a, b] = dynamics.slots[0].particles
+  for (const particle of [a, b]) {
+    particle.alive = true; particle.lifetime = 3; particle.size = .16
+    particle.velocity.set(0, -.3, 0); particle.finish = 'coral'
+  }
+  a.position.set(-.98, 0, 0); b.position.set(.98, 0, 0)
+  b.link = 0; b.neck = .9; b.restLength = 1.96; b.separationAge = 1
+  dynamics.step(1 / 90, new THREE.Vector3(0, -7.8, 0), [tile])
+  expect(b.link).toBe(-1)
+  expect(b.neck).toBe(0)
+  expect(a.alive && b.alive).toBe(true)
+  expect(a.position.x).toBeCloseTo(-.98, 4)
+  expect(b.position.x).toBeCloseTo(.98, 4)
+  expect(a.position.y).toBeLessThan(0)
+  expect(b.position.y).toBeLessThan(0)
+  expect(dynamics.surfaceCount).toBe(0)
+})

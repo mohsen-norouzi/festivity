@@ -172,3 +172,33 @@ test('tiny spheres have their own quieter, shorter, higher-pitched sound profile
   expect(tiny.rate).toBeGreaterThan(larger.rate)
   expect(cube.kind).toBe('large')
 })
+
+test('wet caps track the same interpolated inflation as their rendered host', () => {
+  const parent = new THREE.Group()
+  const coral = new THREE.MeshPhysicalMaterial({ color: '#f18f86' })
+  const effects = createBurstEffects(parent, { coral })
+  const body = cube(); body.halfSize.set(3, 3, 3); body.radius = 5
+  const impact = source()
+  impact.position.set(0, 2.9, 0); impact.velocity.set(0, -20, 0)
+  impact.halfSize.setScalar(.05); impact.radius = .05
+  effects.burst(impact)
+  effects.step(1 / 90, [body])
+  expect(effects.surfaceDrops).toBeGreaterThan(0)
+  effects.render([body], .4, () => body.radius * .8)
+  const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3()
+  let caps = 0
+  parent.traverse(object => {
+    if (!(object instanceof THREE.InstancedMesh)) return
+    const states = object.geometry.getAttribute('liquidState')
+    for (let i = 0; i < object.count; i++) {
+      if (states.getW(i) <= 0) continue
+      object.getMatrixAt(i, matrix); matrix.decompose(position, rotation, scale)
+      expect(scale.x).toBeCloseTo(.8, 5)
+      expect(scale.y).toBeCloseTo(.8, 5)
+      expect(scale.z).toBeCloseTo(.8, 5)
+      caps++
+    }
+  })
+  expect(caps).toBe(effects.surfaceDrops)
+  effects.dispose(); coral.dispose()
+})

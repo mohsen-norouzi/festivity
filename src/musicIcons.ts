@@ -15,10 +15,13 @@ const sources = { note, play, pause, wave, heart, headphones, cloud, globe, spar
 export type MusicIcon = keyof typeof sources
 
 /** Original Phosphor contours, extruded once with a small machined bevel. */
-export function makeMusicIcons(): Record<MusicIcon, THREE.BufferGeometry> {
+export function createMusicIcons() {
   const loader = new SVGLoader()
-  return Object.fromEntries(Object.entries(sources).map(([name, source]) => {
-    let svg = source.replaceAll('currentColor', '#ffffff')
+  const cache = new Map<MusicIcon, THREE.BufferGeometry>()
+  const get = (name: MusicIcon) => {
+    const cached = cache.get(name)
+    if (cached) return cached
+    let svg = sources[name].replaceAll('currentColor', '#ffffff')
     if (name === 'cloud') svg = svg.replace('fill="none"', 'fill="#ffffff"').replace('stroke="#ffffff"', 'stroke="none"').replace('<path', '<g transform="scale(10.6666667)"><path').replace('</svg>', '</g></svg>')
     const parts = loader.parse(svg).paths.flatMap(path => SVGLoader.createShapes(path).map(shape =>
       new THREE.ExtrudeGeometry(shape, { depth: 5, bevelEnabled: true, bevelSize: 1.15, bevelThickness: 1.15, bevelSegments: 2, steps: 1, curveSegments: 14 }),
@@ -32,6 +35,8 @@ export function makeMusicIcons(): Record<MusicIcon, THREE.BufferGeometry> {
     geometry.translate(-center.x, -center.y, -center.z)
     geometry.scale(scale, scale, scale)
     geometry.rotateX(Math.PI)
-    return [name, geometry]
-  })) as Record<MusicIcon, THREE.BufferGeometry>
+    cache.set(name, geometry)
+    return geometry
+  }
+  return { get, dispose() { cache.forEach(geometry => geometry.dispose()); cache.clear() } }
 }

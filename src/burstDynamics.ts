@@ -24,7 +24,7 @@ const makeParticle = () => ({
   alive: false, age: 0, lifetime: 1, size: .02, drag: 1, roughness: 1, metalness: 0,
   position: new THREE.Vector3(), previous: new THREE.Vector3(), velocity: new THREE.Vector3(), rotation: new THREE.Quaternion(),
   proportions: new THREE.Vector3(1, 1, 1), color: new THREE.Color(), mote: false, finish: '',
-  phase: 0, ignoreBody: -1, link: -1, neck: 0, restLength: 0, separationAge: 1,
+  phase: 0, link: -1, neck: 0, restLength: 0, separationAge: 1,
 })
 export type BurstParticle = ReturnType<typeof makeParticle>
 const makeSurfaceDrop = () => ({
@@ -95,7 +95,7 @@ export function createBurstDynamics(random: () => number = Math.random) {
       particle.mote = index >= FRAGMENTS_PER_BURST
       particle.alive = particle.mote ? index - FRAGMENTS_PER_BURST < motes : index < fragments
       if (!particle.alive) return
-      particle.age = 0; particle.finish = source.finish; particle.ignoreBody = -1
+      particle.age = 0; particle.finish = source.finish
       particle.link = -1; particle.neck = 0
       const weight = random() ** 2.4
       particle.size = source.radius * (particle.mote ? .005 + random() * .01 : .019 + weight * .135)
@@ -135,6 +135,18 @@ export function createBurstDynamics(random: () => number = Math.random) {
     return slot
   }
 
+  const severLinks = (particle: BurstParticle) => {
+    // Pool entries are recycled for drips. An old lobe must never become linked
+    // to an unrelated droplet that happens to reuse its former partner's slot.
+    for (const slot of slots) {
+      const index = slot.particles.indexOf(particle)
+      if (index < 0) continue
+      for (const other of slot.particles) if (other.link === index) { other.link = -1; other.neck = 0 }
+      break
+    }
+    particle.link = -1; particle.neck = 0
+  }
+
   const deposit = (particle: BurstParticle, body: WireBody, index: number, impact: number) => {
     local.subVectors(particle.position, body.position).applyQuaternion(bodyInverses[index])
     project(local, body)
@@ -156,27 +168,13 @@ export function createBurstDynamics(random: () => number = Math.random) {
     }
     syncDeposit(drop, body)
     particle.alive = false
-    particle.link = -1; particle.neck = 0
+    severLinks(particle)
   }
 
   const collide = (particle: BurstParticle, from: THREE.Vector3, bodies: readonly WireBody[]) => {
     // Include the full stretched, wobbling lobe seen in the vertex shader.
     const padding = particle.mote ? particle.size : particle.size * 2.15
-    let ignoreBody = -1
-    const releasing = bodies[particle.ignoreBody]
-    if (releasing && releasing.enabled !== false) {
-      local.subVectors(particle.position, releasing.position).applyQuaternion(bodyInverses[particle.ignoreBody])
-      project(local, releasing)
-      normal.applyQuaternion(releasing.rotation)
-      lever.subVectors(particle.position, releasing.position)
-      surfaceVelocity.crossVectors(releasing.spin, lever).add(releasing.velocity)
-      delta.subVectors(particle.velocity, surfaceVelocity)
-      // Let a drip finish pulling out of its own wet film while it is moving outward.
-      // A host moving back into it still makes contact immediately.
-      if (delta.dot(normal) > 0 && lever.length() < releasing.radius + padding) ignoreBody = particle.ignoreBody
-      else particle.ignoreBody = -1
-    }
-    const hit = contacts.sweep(from, particle.position, padding, ignoreBody)
+    const hit = contacts.sweep(from, particle.position, padding, -1, true, true)
     if (!hit) return
     if (particle.mote) { particle.alive = false; return }
     particle.position.copy(hit.point)
@@ -192,14 +190,16 @@ export function createBurstDynamics(random: () => number = Math.random) {
       if (particle) break
     }
     if (!particle) return
+    severLinks(particle)
     particle.alive = true; particle.mote = false; particle.age = 0; particle.lifetime = 3.2
     particle.finish = drop.finish; particle.size = drop.size * .88; particle.drag = 1.3
     particle.color.copy(drop.color); particle.roughness = drop.roughness; particle.metalness = 0
-    particle.ignoreBody = drop.bodyIndex; particle.phase = random() * Math.PI * 2
+    particle.phase = random() * Math.PI * 2
     particle.link = -1; particle.neck = 0
     particle.position.copy(drop.position).addScaledVector(drop.normal, particle.size * 1.1)
     lever.subVectors(particle.position, body.position)
-    particle.velocity.crossVectors(body.spin, lever).add(body.velocity).addScaledVector(drop.normal, .25)
+    particle.velocity.crossVectors(body.spin, lever).add(body.velocity)
+    particle.velocity.add(delta.copy(drop.flow).applyQuaternion(body.rotation))
     particle.previous.copy(particle.position)
     particle.proportions.set(1, 1, 1); particle.rotation.identity()
     drop.alive = false
@@ -269,9 +269,8 @@ export function createBurstDynamics(random: () => number = Math.random) {
       const width = Math.min(particle.size, partner.size) * particle.neck * 2.1 + bow
       const hit = contacts.sweep(partner.position, particle.position, width, -1, false)
       if (hit) {
-        particle.position.copy(hit.point)
-        const body = bodies[hit.index]
-        deposit(particle, body, hit.index, particle.velocity.distanceTo(body.velocity))
+        // The strand tears on an obstacle. Its distant endpoints keep their own
+        // momentum; only an endpoint's actual swept impact can create a deposit.
         particle.link = -1; particle.neck = 0
       }
     }

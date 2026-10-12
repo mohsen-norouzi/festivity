@@ -46,6 +46,8 @@ export function createOrbits(parent: THREE.Group) {
   const orbit = new THREE.Mesh(geometry, material)
   orbit.frustumCulled = false
   group.add(orbit)
+  orbit.visible = false
+  let reveal = 0
   const normal = new THREE.Vector3()
   const binormal = new THREE.Vector3()
   const seamNormal = new THREE.Vector3()
@@ -85,9 +87,9 @@ export function createOrbits(parent: THREE.Group) {
         const ny = normal.y * Math.cos(angle) + binormal.y * Math.sin(angle)
         const nz = normal.z * Math.cos(angle) + binormal.z * Math.sin(angle)
         const offset = (i * sides + j) * 3
-        positions[offset] = centers[i].x + nx * WIRE_RADIUS
-        positions[offset + 1] = centers[i].y + ny * WIRE_RADIUS
-        positions[offset + 2] = centers[i].z + nz * WIRE_RADIUS
+        positions[offset] = centers[i].x + nx * WIRE_RADIUS * reveal
+        positions[offset + 1] = centers[i].y + ny * WIRE_RADIUS * reveal
+        positions[offset + 2] = centers[i].z + nz * WIRE_RADIUS * reveal
         normals[offset] = nx; normals[offset + 1] = ny; normals[offset + 2] = nz
       }
     }
@@ -105,5 +107,5 @@ export function createOrbits(parent: THREE.Group) {
   update()
   const reset = () => { wire.reset(); bubblePhysics.reset() }
   const rest = () => { wire.rest(); bubblePhysics.rest() }
-  return { wire, bubbleMesh: bubbles, bubbleBodies: bubblePhysics.bodies, step, reset, rest, update, dispose() { geometry.dispose(); material.dispose(); bubbleGeometry.dispose(); bubbleMaterial.dispose(); bubbles.dispose(); parent.remove(group) } }
+  return { wire, wireMesh: orbit, reveal(value: number) { reveal = value; orbit.visible = value > 0 }, bubbleMesh: bubbles, bubbleBodies: bubblePhysics.bodies, step, reset, rest, update, dispose() { geometry.dispose(); material.dispose(); bubbleGeometry.dispose(); bubbleMaterial.dispose(); bubbles.dispose(); parent.remove(group) } }
 }
