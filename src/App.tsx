@@ -1,8 +1,7 @@
-import noteIcon from './assets/icons/music-notes-fill.svg'
-import heartIcon from './assets/icons/heart-fill.svg'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { MUSIC_MOODS, type MoodId, type MusicState } from './musicMoods'
 import type { OrnamentScene } from './scene'
+import { JellyCard } from './JellyCard'
 
 function PauseIcon({ paused }: { paused: boolean }) {
   return paused
@@ -23,6 +22,9 @@ export default function App() {
   const [paused, setPaused] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [menuOpen, setMenuOpen] = useState(false)
   const [resetCount, setResetCount] = useState(0)
+  const [connectionOpen, setConnectionOpen] = useState(false)
+  const [discoveryCount, setDiscoveryCount] = useState(0)
+  const discoveryDeck = useRef<MoodId[]>([])
   const [music, setMusic] = useState<MusicState>({ mood: null, playing: false, audible: false })
   const song = music.mood ? MUSIC_MOODS[music.mood] : null
 
@@ -93,6 +95,17 @@ export default function App() {
   }
 
   const scatter = () => scene.current?.scatter()
+  const discover = () => {
+    if (!ready || !scene.current) return
+    // Draw without repeating until the remaining tracks have all had a turn.
+    let remaining = discoveryDeck.current.filter(id => id !== music.mood)
+    if (!remaining.length) remaining = tracks.map(([id]) => id).filter(id => id !== music.mood)
+    const index = Math.floor(Math.random() * remaining.length)
+    const [next] = remaining.splice(index, 1)
+    discoveryDeck.current = remaining
+    scene.current.selectTrack(next)
+    setDiscoveryCount(count => count + 1)
+  }
 
   return (
     <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''} ${music.audible ? 'is-music-playing' : ''} ${song ? 'has-music' : ''}`} style={{ '--mood-accent': song?.accent ?? '#e5c4ff' } as CSSProperties}>
@@ -151,24 +164,27 @@ export default function App() {
         <span className={paused ? 'status-dot is-paused' : 'status-dot'} />
       </div>
 
-      <div className="floating-card community-card" aria-label="Real-time royalties and transparent collaborations">
-        <div className="avatar-pair" aria-hidden="true"><span><img src={noteIcon} alt="" /></span><span><img src={heartIcon} alt="" /></span></div>
-        <p><strong>Real-time royalties</strong><span>Transparent collaborations</span></p>
-      </div>
-      <button className="floating-card explore-card music-player" onClick={() => scene.current?.toggleMusic()} aria-label={music.playing ? 'Pause music' : 'Play music'} aria-pressed={music.playing}>
-        <span className="music-meter" aria-hidden="true"><i /><i /><i /><i /><i /></span>
-        <span className="music-copy">
-          <span className="music-eyebrow">{music.error ? 'UNABLE TO PLAY · RETRY' : song ? music.loading ? 'LOADING TRACK' : music.playing ? music.audible ? 'NOW PLAYING' : 'SOUND OFF' : 'PAUSED' : 'FIND YOUR FREQUENCY'}</span>
-          <strong>{song?.name ?? 'Explore the sound'}</strong>
-          <span className="music-subtitle">{song?.artist ?? 'Click a shape to toggle'}</span>
-        </span>
-        <span className="card-action" aria-hidden="true"><PauseIcon paused={!music.playing} /></span>
-      </button>
-      <a className="floating-card together-card join-card" href="https://www.musync.me/en/#apply" target="_blank" rel="noopener noreferrer" aria-label="I’m interested — open the MUSYNC waitlist">
-        <span className="connection-mark" aria-hidden="true"><i /><i /><i /></span>
-        <p><strong>I’m interested</strong><span>Meet your next chapter</span></p>
-        <span className="together-star" aria-hidden="true">↗</span>
-      </a>
+      <JellyCard className="connection-jelly">
+        <button className="jelly-surface glass-pill" onClick={() => setConnectionOpen(open => !open)} aria-expanded={connectionOpen} aria-controls="connection-details" aria-label={connectionOpen ? 'Close the MUSYNC connection details' : 'Why MUSYNC? Discover the artist–fan connection'}>
+          <svg className="pill-symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 8 2-2a5 5 0 0 1 7 7l-2 2M15 16l-2 2a5 5 0 0 1-7-7l2-2M8 16l8-8" /></svg>
+          <span className="pill-copy" id="connection-details"><strong>{connectionOpen ? 'Real-time royalties' : 'Artists & fans'}</strong><span>{connectionOpen ? 'Transparent collaborations' : 'Connected. Directly.'}</span></span>
+          <span className="pill-action" aria-hidden="true">{connectionOpen ? '−' : '+'}</span>
+        </button>
+      </JellyCard>
+      <JellyCard className="discovery-jelly">
+        <button className="jelly-surface glass-pill" disabled={!ready} onClick={discover} aria-label="Surprise me — play a different track">
+          <svg className="pill-symbol" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 9h3c5 0 9 14 14 14h3m-5-5 5 5-5 5M6 23h3c2 0 4-3 6-7m3-5c2-2 3-2 5-2h3m-5-5 5 5-5 5" /></svg>
+          <span className="pill-copy"><strong>Surprise me</strong><span>{music.loading && discoveryCount > 0 ? 'Finding your sound…' : 'Discover a new track'}</span></span>
+          <span className="pill-action" aria-hidden="true">↗</span>
+        </button>
+      </JellyCard>
+      <JellyCard className="invitation-jelly">
+        <a className="jelly-surface glass-pill" href="https://www.musync.me/en/#apply" target="_blank" rel="noopener noreferrer" aria-label="Join MUSYNC — open the waitlist">
+          <img className="pill-brand" src="/brand/musync-symbol-white.svg" alt="" aria-hidden="true" />
+          <span className="pill-copy"><strong>Join MUSYNC</strong><span>Meet your next chapter</span></span>
+          <span className="pill-action" aria-hidden="true">↗</span>
+        </a>
+      </JellyCard>
 
       <button className="large-x brand-symbol absolute z-10" onClick={scatter} aria-label="Scatter the shapes" title="Scatter the shapes"><img src="/brand/musync-symbol-white.svg" alt="" width="96" height="109" /></button>
       <div className="edition absolute z-10 flex items-center pointer-events-none" aria-label="Experiment 01"><span className="display-font">01</span><span className="edition-dash" /></div>
@@ -188,6 +204,7 @@ export default function App() {
 
       {!ready && !error && <div className="entrance-signal pointer-events-none" role="status" aria-label="The sculpture is arriving"><i /><i /><i /><i /><i /></div>}
       {error && <div className="error-state absolute inset-0 z-10 flex items-center justify-center"><p>This experiment needs WebGL.<br /><span>Please enable hardware acceleration and reload.</span></p></div>}
+      <span className="sr-only" role="status">{discoveryCount > 0 && song ? `${music.loading ? 'Loading' : music.error ? 'Unable to play' : music.playing ? 'Playing' : 'Paused'} ${song.name} by ${song.artist}.` : ''}</span>
       <span className="sr-only" role="status">{resetCount > 0 ? `Composition reset ${resetCount} ${resetCount === 1 ? 'time' : 'times'}.` : ''}</span>
     </main>
   )
