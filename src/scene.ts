@@ -97,7 +97,6 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
 
   const studio = createStudio(renderer, scene)
   const orbits = createOrbits(cluster)
-  const burstEffects = createBurstEffects(cluster)
   const burstAudio = createBurstAudio()
   const finishes: Record<Finish, THREE.MeshPhysicalMaterial> = {
     ink: new THREE.MeshPhysicalMaterial({ color: '#101421', roughness: .32, metalness: .08, clearcoat: .32, clearcoatRoughness: .32, envMapIntensity: .9 }),
@@ -107,6 +106,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     pearl: new THREE.MeshPhysicalMaterial({ color: '#f1deda', roughness: .3, metalness: 0, clearcoat: .42, clearcoatRoughness: .26, envMapIntensity: .85 }),
     glass: new THREE.MeshPhysicalMaterial({ color: '#fff4fc', roughness: .18, metalness: 0, transmission: .94, thickness: .8, ior: 1.46, clearcoat: .85, clearcoatRoughness: .26, attenuationColor: '#cfaae9', attenuationDistance: 6, envMapIntensity: 1.1 }),
   }
+  const burstEffects = createBurstEffects(cluster, { ...finishes, bubble: orbits.bubbleMesh.material })
   const contactLighting = createContactLighting(COUNT)
   Object.entries(finishes).forEach(([name, material]) => {
     material.dithering = true
@@ -245,13 +245,12 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   // The glass spheres participate in the same raycast and drag path as the tiles.
   const interactiveMeshes = [...meshes, orbits.bubbleMesh]
   const interactiveBodies = [...bodies, ...orbits.bubbleBodies]
-  const burstColor = new THREE.Color('#ebd9ff')
+  const baseRadii = interactiveBodies.map(body => body.radius)
   const burstOrigin = new THREE.Vector3()
   const lifecycle = createBurstLifecycle(interactiveBodies, (index, body) => {
     burstOrigin.copy(body.position)
-    burstColor.set(index < COUNT ? finishes[pieces[index].finish].color : '#ebd9ff')
-    burstEffects.burst(burstOrigin, body.radius, burstColor)
-    burstAudio.play(body.isSphere === true || pieces[index]?.r < .5)
+    burstEffects.burst({ position: burstOrigin, radius: body.radius, baseRadius: baseRadii[index], halfSize: body.halfSize, rotation: body.rotation, velocity: body.velocity, shapePower: body.shapePower, finish: index < COUNT ? pieces[index].finish : 'bubble', isSphere: body.isSphere === true })
+    burstAudio.play(baseRadii[index], body.isSphere === true)
     // A restrained pressure pulse passes through neighboring ornaments and cable.
     const reach = body.radius + 2.1
     interactiveBodies.forEach((neighbor, i) => {
@@ -519,7 +518,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   reset()
   resize()
   // Include the hidden particle materials so the first pop does not compile shaders.
-  void renderer.compileAsync(scene, camera).catch(() => {})
+  renderer.compile(scene, camera)
 
   const tick = (now: number) => {
     if (disposed) return
@@ -536,6 +535,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         host.dataset.wireContacts = String(orbits.wire.contacts)
         host.dataset.bursts = String(lifecycle.pops)
         host.dataset.soundPlays = String(burstAudio.plays)
+        host.dataset.lastSound = burstAudio.lastSound
         frameCount = 0; sampleTime = now
       }
     }
@@ -550,7 +550,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       while (accumulator >= STEP && steps++ < 6) { step(STEP); accumulator -= STEP }
       accumulator = Math.max(0, Math.min(accumulator, STEP))
       updateInstances(accumulator / STEP)
-      burstEffects.update(dt)
+      burstEffects.update(dt, interactiveBodies)
       const charge = dragging >= 0 ? lifecycle.states[dragging].charge : 0
       cursor.classList.toggle('is-charging', canInflate && charge > .025)
       cursor.style.setProperty('--charge', String(charge))

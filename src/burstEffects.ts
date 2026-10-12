@@ -1,22 +1,56 @@
 import * as THREE from 'three'
+import { createBurstDynamics, BURST_SLOTS, FRAGMENTS_PER_BURST, MOTES_PER_BURST, type BurstSource } from './burstDynamics'
+import type { WireBody } from './wirePhysics'
 
-const SLOTS = 4, DROPS = 36, DUST = 54, DURATION = 1.15
+function fragmentGeometry() {
+  const geometry = new THREE.BoxGeometry(2, 2, 2, 4, 4, 4)
+  const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal')
+  const normal = new THREE.Vector3(), power = 3.2
+  for (let i = 0; i < positions.count; i++) {
+    const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i)
+    const scale = (Math.abs(x) ** power + Math.abs(y) ** power + Math.abs(z) ** power) ** (-1 / power)
+    positions.setXYZ(i, x * scale, y * scale, z * scale)
+    normal.set(Math.sign(x) * Math.abs(x) ** (power - 1), Math.sign(y) * Math.abs(y) ** (power - 1), Math.sign(z) * Math.abs(z) ** (power - 1)).normalize()
+    normals.setXYZ(i, normal.x, normal.y, normal.z)
+  }
+  return geometry
+}
 
-/** A fixed pool: polished droplets, soft prismatic dust, and one fading pressure ring. */
-export function createBurstEffects(parent: THREE.Group) {
+/** Reusable material batches keep real ceramic, satin, and glass finishes in the debris. */
+export function createBurstEffects(parent: THREE.Group, finishes: Record<string, THREE.MeshPhysicalMaterial>) {
   const group = new THREE.Group()
   parent.add(group)
-  const dropletGeometry = new THREE.SphereGeometry(1, 12, 8)
-  const dropletMaterial = new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: .2, metalness: .24, clearcoat: .8, clearcoatRoughness: .16, iridescence: .35, envMapIntensity: 1.25, dithering: true })
-  const droplets = new THREE.InstancedMesh(dropletGeometry, dropletMaterial, SLOTS * DROPS)
-  droplets.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-  droplets.setColorAt(0, new THREE.Color('#ffffff'))
-  droplets.frustumCulled = false; droplets.count = 0
-  group.add(droplets)
-  const positions = new Float32Array(SLOTS * DUST * 3)
-  const colors = new Float32Array(positions.length)
-  const sizes = new Float32Array(SLOTS * DUST)
-  const opacities = new Float32Array(sizes.length)
+  const dynamics = createBurstDynamics()
+  const cubeGeometry = fragmentGeometry(), sphereGeometry = new THREE.SphereGeometry(1, 16, 10)
+  const capacity = BURST_SLOTS * FRAGMENTS_PER_BURST
+  const batches = new Map(Object.entries(finishes).map(([name, source]) => {
+    const geometry = (name === 'bubble' ? sphereGeometry : cubeGeometry).clone()
+    const finishAttribute = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 2), 2).setUsage(THREE.DynamicDrawUsage)
+    geometry.setAttribute('fragmentFinish', finishAttribute)
+    const material = new THREE.MeshPhysicalMaterial().copy(source)
+    material.color.set('#ffffff')
+    material.thickness *= .2
+    material.dithering = true
+    material.onBeforeCompile = shader => {
+      shader.vertexShader = 'attribute vec2 fragmentFinish; varying vec2 vFragmentFinish;\n' + shader.vertexShader
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvFragmentFinish = fragmentFinish;')
+      shader.fragmentShader = 'varying vec2 vFragmentFinish;\n' + shader.fragmentShader
+      shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor * vFragmentFinish.x, 0.055, 0.85);')
+      shader.fragmentShader = shader.fragmentShader.replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = clamp(metalnessFactor + vFragmentFinish.y, 0.0, 0.6);')
+    }
+    material.customProgramCacheKey = () => 'source-fragment-finish-v1'
+    const mesh = new THREE.InstancedMesh(geometry, material, capacity)
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    mesh.setColorAt(0, new THREE.Color('#ffffff'))
+    mesh.instanceColor!.setUsage(THREE.DynamicDrawUsage)
+    mesh.frustumCulled = false; mesh.count = 0; mesh.visible = false
+    group.add(mesh)
+    const batch = { mesh, geometry, material, finishAttribute, count: 0 }
+    return [name, batch] as const
+  }))
+
+  const positions = new Float32Array(BURST_SLOTS * MOTES_PER_BURST * 3), colors = new Float32Array(positions.length)
+  const sizes = new Float32Array(BURST_SLOTS * MOTES_PER_BURST), opacities = new Float32Array(sizes.length)
   const dustGeometry = new THREE.BufferGeometry()
   dustGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage))
   dustGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage))
@@ -41,86 +75,72 @@ export function createBurstEffects(parent: THREE.Group) {
       varying float vOpacity;
       void main() {
         float d = length(gl_PointCoord - 0.5) * 2.0;
-        float glow = exp(-d * d * 5.0) * smoothstep(1.0, 0.6, d);
+        float glow = exp(-d * d * 5.0) * (1.0 - smoothstep(0.6, 1.0, d));
         gl_FragColor = vec4(vColor, glow * vOpacity);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
   })
   const dust = new THREE.Points(dustGeometry, dustMaterial)
-  dust.frustumCulled = false
+  dust.frustumCulled = false; dust.visible = false
   group.add(dust)
-  const ringGeometry = new THREE.RingGeometry(.987, 1, 96)
-  const slots = Array.from({ length: SLOTS }, (_, slot) => {
-    const ringMaterial = new THREE.MeshBasicMaterial({ color: '#f5d7f0', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })
-    const ring = new THREE.Mesh(ringGeometry, ringMaterial)
-    ring.visible = false; group.add(ring)
-    // Low-discrepancy directions avoid lumpy bursts without random allocations.
-    const directions = Array.from({ length: DROPS + DUST }, (_, i) => {
-      const angle = i * 2.399963 + slot * .7
-      const z = Math.sin(i * 1.73 + slot) * .6
-      return new THREE.Vector3(Math.cos(angle), Math.sin(angle), z).normalize()
-    })
-    return { age: DURATION, center: new THREE.Vector3(), color: new THREE.Color(), radius: 1, ring, ringMaterial, directions }
-  })
-  const dummy = new THREE.Object3D(), point = new THREE.Vector3(), tint = new THREE.Color(), up = new THREE.Vector3(0, 1, 0)
-  const pearl = new THREE.Color('#ffe7f3'), blue = new THREE.Color('#b6d7ff')
-  let nextSlot = 0
+  const dummy = new THREE.Object3D(), gravity = new THREE.Vector3(), inverse = new THREE.Quaternion(), tint = new THREE.Color()
+  let activeFragments = 0
 
-  const burst = (position: THREE.Vector3, radius: number, color: THREE.Color) => {
-    const slot = slots[nextSlot++ % SLOTS]
-    slot.age = 0; slot.center.copy(position); slot.radius = radius; slot.color.copy(color).lerp(pearl, .36)
-    slot.ring.position.copy(position); slot.ring.position.z += radius * .5
-    slot.ringMaterial.color.copy(slot.color).lerp(pearl, .5)
+  const burst = (source: Omit<BurstSource, 'color'>) => {
+    const material = finishes[source.finish]
+    tint.copy(material.color)
+    if (material.transmission > 0 && Number.isFinite(material.attenuationDistance)) tint.lerp(material.attenuationColor, .45)
+    dynamics.burst({ ...source, color: tint })
   }
-  const update = (dt: number) => {
-    let dropCount = 0, dustCount = 0
-    for (const slot of slots) {
-      slot.age += dt
-      const t = slot.age / DURATION
-      slot.ring.visible = t < .62
-      if (t >= 1) continue
-      const energy = 1 - Math.exp(-slot.age * 5.5)
-      const fade = (1 - t) ** 1.6
-      const extent = Math.max(.55, slot.radius)
-      slot.ring.scale.setScalar(slot.radius * (.6 + energy * 1.55))
-      slot.ringMaterial.opacity = .32 * Math.max(0, 1 - t / .62) ** 2
-      for (let i = 0; i < DROPS; i++) {
-        const direction = slot.directions[i]
-        const spread = extent * (.35 + energy * (1.25 + (i % 7) * .16))
-        dummy.position.copy(slot.center).addScaledVector(direction, spread)
-        dummy.position.y -= slot.age * slot.age * .35
-        dummy.quaternion.setFromUnitVectors(up, direction)
-        const size = extent * (.025 + (i % 5) * .008) * fade
-        dummy.scale.set(size, size * (1.3 + (1 - energy) * 2.3), size)
-        dummy.updateMatrix(); droplets.setMatrixAt(dropCount, dummy.matrix)
-        tint.copy(slot.color).lerp(i % 3 ? pearl : blue, (i % 4) * .18)
-        droplets.setColorAt(dropCount++, tint)
-      }
-      for (let i = 0; i < DUST; i++) {
-        const direction = slot.directions[DROPS + i]
-        const spread = extent * (.15 + energy * (1.4 + (i % 9) * .16))
-        point.copy(slot.center).addScaledVector(direction, spread)
-        point.y += slot.age * Math.sin(i) * .16
-        point.toArray(positions, dustCount * 3)
-        tint.copy(slot.color).lerp(i % 2 ? blue : pearl, .7).toArray(colors, dustCount * 3)
-        sizes[dustCount] = extent * (.045 + (i % 5) * .026) * (1 - t * .65)
-        opacities[dustCount++] = fade * .8
+  const update = (dt: number, bodies: readonly WireBody[] = []) => {
+    if (!dynamics.active && activeFragments === 0 && !dust.visible) return
+    // Gravity stays vertically down on screen while the sculpture subtly tilts.
+    gravity.set(0, -7.8, 0).applyQuaternion(inverse.copy(parent.quaternion).invert()).divideScalar(parent.scale.x)
+    dynamics.step(dt, gravity, bodies)
+    batches.forEach(batch => { batch.count = 0 })
+    let dustCount = 0
+    activeFragments = 0
+    for (const slot of dynamics.slots) for (const particle of slot.particles) {
+      if (!particle.alive) continue
+      const t = particle.age / particle.lifetime
+      if (particle.mote) {
+        particle.position.toArray(positions, dustCount * 3)
+        particle.color.toArray(colors, dustCount * 3)
+        sizes[dustCount] = particle.size * 3
+        opacities[dustCount++] = (1 - t) ** 1.5 * .48
+      } else {
+        const batch = batches.get(slot.finish)!
+        // Keep fragment mass visible along the arc; taper only at the end of its life.
+        const fade = 1 - THREE.MathUtils.smoothstep(t, .68, 1)
+        dummy.position.copy(particle.position)
+        dummy.quaternion.copy(particle.rotation)
+        dummy.scale.copy(particle.proportions).multiplyScalar(particle.size * fade)
+        dummy.updateMatrix()
+        batch.mesh.setMatrixAt(batch.count, dummy.matrix)
+        batch.mesh.setColorAt(batch.count, particle.color)
+        batch.finishAttribute.setXY(batch.count++, particle.roughness, particle.metalness)
+        activeFragments++
       }
     }
-    droplets.count = dropCount
-    droplets.visible = dropCount > 0; dust.visible = dustCount > 0
-    if (dropCount) { droplets.instanceMatrix.needsUpdate = true; droplets.instanceColor!.needsUpdate = true }
+    batches.forEach(batch => {
+      batch.mesh.count = batch.count; batch.mesh.visible = batch.count > 0
+      if (batch.count) { batch.mesh.instanceMatrix.needsUpdate = true; batch.mesh.instanceColor!.needsUpdate = true; batch.finishAttribute.needsUpdate = true }
+    })
+    dust.visible = dustCount > 0
     if (dustCount) {
       dustGeometry.setDrawRange(0, dustCount)
       for (const attribute of Object.values(dustGeometry.attributes)) attribute.needsUpdate = true
     }
   }
-  const reset = () => { slots.forEach(slot => { slot.age = DURATION; slot.ring.visible = false }); droplets.visible = dust.visible = false }
-  reset()
+  const reset = () => { dynamics.reset(); activeFragments = 0; batches.forEach(batch => { batch.mesh.visible = false; batch.mesh.count = 0 }); dust.visible = false }
   return {
-    burst, update, reset,
+    burst, update, reset, get activeFragments() { return activeFragments },
     resize(pixelsPerUnit: number) { dustMaterial.uniforms.pixelsPerUnit.value = pixelsPerUnit },
-    dispose() { parent.remove(group); droplets.dispose(); dropletGeometry.dispose(); dropletMaterial.dispose(); dustGeometry.dispose(); dustMaterial.dispose(); ringGeometry.dispose(); slots.forEach(slot => slot.ringMaterial.dispose()) },
+    dispose() {
+      parent.remove(group)
+      batches.forEach(batch => { batch.mesh.dispose(); batch.geometry.dispose(); batch.material.dispose() })
+      cubeGeometry.dispose(); sphereGeometry.dispose(); dustGeometry.dispose(); dustMaterial.dispose()
+    },
   }
 }
