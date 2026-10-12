@@ -1,6 +1,6 @@
 # Festivity — Music, in Motion
 
-A local, single-hero React and Three.js experiment. A floating sculpture of rounded music tiles, capsules, rings, and small satellites. Coral ceramic, lilac, pearl, dark satin, and refractive glass sit against a warm-to-cool studio backdrop. No extra pages or deployment.
+A local, single-hero React and Three.js experiment. A floating sculpture of rounded music tiles, capsules, small satellites, a reflective orbit, and iridescent bubbles. Floating cards sit within the same hero; the Explore card remixes the sculpture. Coral ceramic, lilac, pearl, periwinkle, dark satin, and refractive glass sit against a warm-to-cool studio backdrop. No extra pages or deployment.
 
 ## Run
 
@@ -27,12 +27,15 @@ bun run preview
 
 ## Rendering
 
-- `src/scene.ts`: 34 physical bodies, fixed 90 Hz simulation, interpolated motion, smooth superellipsoid geometry with analytic normals, and physical materials.
-- `src/musicIcons.ts`: extruded procedural music symbols. Icons render after transmission to avoid ghosted refraction.
-- `src/studio.ts`: a baked studio environment, feathered softboxes, and a procedural gradient backdrop.
+- `src/scene.ts`: 26 physical bodies, fixed 90 Hz simulation, interpolated motion, smooth superellipsoid geometry with analytic normals, and physical materials.
+- `src/musicIcons.ts`: beveled music symbols from official Phosphor SVG contours and the Lucide cloud silhouette. Icons render after transmission to avoid ghosted refraction.
+- `src/orbits.ts`: one reflective orbital curve and five instanced iridescent glass bubbles.
+- `src/studio.ts`: a baked studio environment, feathered softboxes, and a procedural gradient backdrop with soft diagonal light streaks.
 - `src/contactLighting.ts`: all-neighbor contact lighting compressed into directional coefficients, with three texture samples per vertex and no nearest-neighbor switching.
 - `src/App.tsx` and `src/style.css`: accessible controls and responsive hero layout.
 
 Native MSAA and 1.5–2× rendering preserve edges within a five-million-pixel budget. The glass refraction buffer uses 35% of the render resolution; rough refraction conceals the reduced resolution while keeping the sculpture sharp. Small satellites use lighter geometry. Paused scenes stop rendering; hidden tabs suspend simulation. All assets are local or procedural.
+
+Icon sources: [Phosphor](https://github.com/phosphor-icons/core) and [Lucide](https://github.com/lucide-icons/lucide). The original licenses are included in `src/assets/icons/`. SVG geometry is generated once; icons are served locally, without an icon API.
 
 React + TypeScript + Vite + Bun + Tailwind CSS + Three.js. Festivity is an experiment name, not the final platform identity.

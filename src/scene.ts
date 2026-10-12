@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { makeMusicIcons, type MusicIcon } from './musicIcons'
 import { createStudio } from './studio'
+import { createOrbits } from './orbits'
 import { createContactLighting } from './contactLighting'
 
 export interface OrnamentScene {
@@ -24,45 +25,38 @@ interface Body {
   phase: number
 }
 
-type Finish = 'ink' | 'coral' | 'lilac' | 'pearl' | 'glass'
+type Finish = 'ink' | 'coral' | 'lilac' | 'pearl' | 'glass' | 'blue'
 type Form = 'tile' | 'capsule' | 'ring' | 'disc'
-interface Piece { p: [number, number, number]; r: number; finish: Finish; icon?: MusicIcon; form?: Form; tilt?: [number, number, number] }
+interface Piece { p: [number, number, number]; r: number; finish: Finish; icon?: MusicIcon; lettering?: boolean; form?: Form; tilt?: [number, number, number] }
 const pieces: Piece[] = [
-  { p: [-.1, .05, 2], r: 1.02, finish: 'ink', icon: 'play', tilt: [-.13, .23, -.25] },
-  { p: [-2.02, .75, 1.28], r: .99, finish: 'glass', icon: 'wave', tilt: [-.15, -.22, -.22] },
-  { p: [-1.35, -1.38, 1.9], r: 1.02, finish: 'coral', icon: 'note', tilt: [.12, -.25, .21] },
-  { p: [2.65, -.9, 1.27], r: 1, finish: 'coral', icon: 'heart', tilt: [-.15, -.26, -.3] },
-  { p: [1.25, 1.75, 1.15], r: .97, finish: 'glass', icon: 'note', tilt: [.12, -.21, .2] },
-  { p: [1.46, -.12, 1.8], r: .96, finish: 'pearl', icon: 'headphones', tilt: [.12, .2, .15] },
-  { p: [2.25, 1.05, -.05], r: 1.03, finish: 'lilac', icon: 'note', form: 'capsule', tilt: [.1, -.12, .07] },
-  { p: [.88, -1.9, .94], r: .89, finish: 'glass', icon: 'pause', tilt: [.18, -.15, -.17] },
-  { p: [-3.12, -.28, .78], r: .94, finish: 'ink', icon: 'note', tilt: [.1, .24, .16] },
-  { p: [-2.57, -1.5, -.04], r: .93, finish: 'lilac', form: 'capsule', tilt: [.12, .23, -.24] },
-  { p: [-2.62, 1.25, -.48], r: .85, finish: 'coral', icon: 'wave', tilt: [.14, -.3, .12] },
-  { p: [-.88, 1.75, -.02], r: .93, finish: 'ink', icon: 'note', tilt: [.1, -.2, -.31] },
-  { p: [.04, 2.58, -.53], r: .66, finish: 'coral', icon: 'wave', tilt: [.1, -.27, .13] },
-  { p: [-1.62, 2.25, -.68], r: .7, finish: 'pearl', icon: 'pause', tilt: [.1, .3, -.36] },
-  { p: [3.29, .17, -.15], r: .85, finish: 'ink', icon: 'note', tilt: [-.16, .2, -.22] },
-  { p: [3.6, -.6, -.94], r: .82, finish: 'glass', icon: 'wave', tilt: [.18, -.24, -.3] },
-  { p: [-.13, -1.92, -.39], r: .83, finish: 'ink', icon: 'note', tilt: [.2, .2, .47] },
-  { p: [-1.26, -2.32, -.75], r: .69, finish: 'pearl', icon: 'wave', tilt: [.2, .1, .4] },
-  { p: [-3.2, -1.48, -.95], r: .83, finish: 'coral', icon: 'play', tilt: [.3, .1, .66] },
-  { p: [-.35, .1, -.72], r: .99, finish: 'coral', icon: 'note', tilt: [.1, .2, -.1] },
-  { p: [1.1, -.95, -.7], r: .88, finish: 'lilac', form: 'ring', tilt: [.1, -.35, .1] },
-  { p: [2.1, -1.9, -.87], r: .85, finish: 'ink', form: 'capsule', tilt: [.3, .2, -.2] },
-  { p: [-2, -.3, -.8], r: .83, finish: 'lilac', form: 'ring', tilt: [.1, -.3, .4] },
-  { p: [2.8, 1.75, -.9], r: .71, finish: 'pearl', form: 'ring', tilt: [.3, .4, -.25] },
-  { p: [-.53, .72, 1.46], r: .44, finish: 'lilac', tilt: [.3, .4, .4] },
-  { p: [-4.35, 1.12, .08], r: .3, finish: 'ink', tilt: [.3, .4, .65] },
-  { p: [-4.72, -.12, -.15], r: .24, finish: 'lilac', tilt: [.15, .5, -.35] },
-  { p: [-3.95, -1.82, .03], r: .2, finish: 'coral', form: 'disc' },
-  { p: [4.5, .9, -.2], r: .33, finish: 'ink', icon: 'pause', tilt: [.3, .3, -.5] },
-  { p: [3.72, 1.79, .25], r: .29, finish: 'pearl', tilt: [.2, .35, .35] },
-  { p: [4.38, -1.39, .1], r: .27, finish: 'lilac', tilt: [.2, -.4, -.3] },
-  { p: [2.15, 2.5, -.34], r: .21, finish: 'coral', tilt: [.1, .2, -.2] },
-  { p: [-.1, -2.95, -.3], r: .31, finish: 'pearl', tilt: [.3, .3, -.5] },
-  { p: [-2.51, -2.69, .1], r: .23, finish: 'pearl', form: 'disc' },
+  { p: [-.46, .22, 2.8], r: 1.38, finish: 'glass', icon: 'wave', tilt: [.12, -.22, .24] },
+  { p: [-2.22, .6, 1.83], r: 1.01, finish: 'pearl', icon: 'pause', tilt: [.16, .22, -.25] },
+  { p: [-1.3, 1.86, .65], r: 1.01, finish: 'ink', icon: 'note', tilt: [.12, -.23, -.32] },
+  { p: [.61, -1.45, 2.31], r: 1.02, finish: 'coral', icon: 'heart', tilt: [.15, .2, -.23] },
+  { p: [1.24, 1.7, .9], r: .94, finish: 'pearl', icon: 'wave', tilt: [.17, -.15, .2] },
+  { p: [1.62, .22, 2.05], r: .92, finish: 'glass', icon: 'headphones', tilt: [.12, -.32, .23] },
+  { p: [2.89, -.28, 1.37], r: 1.04, finish: 'ink', lettering: true, tilt: [.15, -.23, .3] },
+  { p: [2.32, -1.85, 1.02], r: .98, finish: 'blue', icon: 'cloud', tilt: [.12, -.25, .22] },
+  { p: [-2.24, -1.1, 1.3], r: .88, finish: 'ink', icon: 'globe', tilt: [.14, .15, -.25] },
+  { p: [-1.15, -2.03, 1.7], r: .7, finish: 'glass', icon: 'sparkle', tilt: [.13, .2, -.3] },
+  { p: [-3.06, -.1, -.4], r: .92, finish: 'lilac', form: 'capsule', tilt: [.25, .22, -.12] },
+  { p: [.05, 2.44, -.4], r: .7, finish: 'coral', icon: 'sparkle', tilt: [.2, -.2, .28] },
+  { p: [2.3, 1.62, -.65], r: .86, finish: 'ink', tilt: [.2, .4, .28] },
+  { p: [2.25, .6, -.48], r: .81, finish: 'blue', icon: 'play', tilt: [.2, -.3, .16] },
+  { p: [3.09, .21, -.81], r: .77, finish: 'coral', tilt: [.2, .3, .3] },
+  { p: [3.55, -.96, -.55], r: .61, finish: 'pearl', tilt: [.2, -.4, .35] },
+  { p: [.58, -1.4, -.6], r: .94, finish: 'ink', tilt: [.2, .2, -.3] },
+  { p: [-.3, -2.16, -.67], r: .78, finish: 'lilac', tilt: [.3, .4, -.4] },
+  { p: [-1.08, -.7, -.2], r: .97, finish: 'coral', icon: 'note', tilt: [.2, .2, .18] },
+  { p: [-2.22, 1.15, -.9], r: .91, finish: 'coral', tilt: [.3, .4, .1] },
+  { p: [.55, .76, -.42], r: .99, finish: 'lilac', tilt: [.15, .3, .18] },
+  { p: [1.64, -1.34, -.98], r: .86, finish: 'pearl', tilt: [.25, .15, -.3] },
+  { p: [3.36, -2.08, -.37], r: .36, finish: 'ink', tilt: [.3, .4, .45] },
+  { p: [-3.65, 1.9, -.5], r: .22, finish: 'coral', tilt: [.3, .2, -.2] },
+  { p: [-3.68, -2.55, -.4], r: .27, finish: 'lilac', tilt: [.2, .4, .2] },
+  { p: [3.38, 2.2, -.5], r: .22, finish: 'pearl', tilt: [.2, .4, -.3] },
 ]
+
 const COUNT = pieces.length
 const STEP = 1 / 90
 
@@ -95,21 +89,37 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   scene.add(cluster)
 
   const studio = createStudio(renderer, scene)
+  const orbits = createOrbits(cluster)
   const finishes: Record<Finish, THREE.MeshPhysicalMaterial> = {
-    ink: new THREE.MeshPhysicalMaterial({ color: '#121524', roughness: .36, metalness: .1, clearcoat: .16, clearcoatRoughness: .38, envMapIntensity: .85 }),
-    coral: new THREE.MeshPhysicalMaterial({ color: '#ee8a81', roughness: .35, metalness: .025, clearcoat: .45, clearcoatRoughness: .33, envMapIntensity: .85 }),
-    lilac: new THREE.MeshPhysicalMaterial({ color: '#a581d6', roughness: .34, metalness: .07, clearcoat: .35, clearcoatRoughness: .34, envMapIntensity: .9 }),
-    pearl: new THREE.MeshPhysicalMaterial({ color: '#eee4e1', roughness: .32, metalness: .035, clearcoat: .45, clearcoatRoughness: .28, envMapIntensity: .8 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: '#fff0ed', roughness: .16, metalness: 0, transmission: .96, thickness: 1.05, ior: 1.46, clearcoat: .7, clearcoatRoughness: .23, attenuationColor: '#c59ad5', attenuationDistance: 7, envMapIntensity: 1.1 }),
+    ink: new THREE.MeshPhysicalMaterial({ color: '#101421', roughness: .32, metalness: .08, clearcoat: .32, clearcoatRoughness: .32, envMapIntensity: .9 }),
+    coral: new THREE.MeshPhysicalMaterial({ color: '#f18f86', roughness: .28, metalness: 0, clearcoat: .62, clearcoatRoughness: .25, envMapIntensity: .9 }),
+    lilac: new THREE.MeshPhysicalMaterial({ color: '#af8aca', roughness: .29, metalness: .03, clearcoat: .45, clearcoatRoughness: .3, envMapIntensity: 1 }),
+    blue: new THREE.MeshPhysicalMaterial({ color: '#758ad1', roughness: .27, metalness: .035, clearcoat: .55, clearcoatRoughness: .28, envMapIntensity: .95 }),
+    pearl: new THREE.MeshPhysicalMaterial({ color: '#f1deda', roughness: .3, metalness: 0, clearcoat: .42, clearcoatRoughness: .26, envMapIntensity: .85 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: '#fff4fc', roughness: .18, metalness: 0, transmission: .94, thickness: .8, ior: 1.46, clearcoat: .85, clearcoatRoughness: .26, attenuationColor: '#cfaae9', attenuationDistance: 6, envMapIntensity: 1.1 }),
   }
   const contactLighting = createContactLighting(COUNT)
   Object.entries(finishes).forEach(([name, material]) => {
     material.dithering = true
     if (name !== 'glass') contactLighting.apply(material)
   })
-  const glyphDark = new THREE.MeshPhysicalMaterial({ color: '#171c32', metalness: .32, roughness: .3, clearcoat: .3, dithering: true, transparent: true })
-  const glyphLight = new THREE.MeshPhysicalMaterial({ color: '#f8e9ef', metalness: .13, roughness: .28, clearcoat: .4, dithering: true, transparent: true })
-  const glyphLilac = new THREE.MeshPhysicalMaterial({ color: '#b5a7e8', metalness: .3, roughness: .3, clearcoat: .3, dithering: true, transparent: true })
+  // Transparent render queue excludes symbols from the glass refraction buffer.
+  const glyphDark = new THREE.MeshPhysicalMaterial({ color: '#192034', metalness: .2, roughness: .33, clearcoat: .22, dithering: true, transparent: true })
+  const glyphLight = new THREE.MeshPhysicalMaterial({ color: '#fff0f5', metalness: .08, roughness: .25, clearcoat: .45, dithering: true, transparent: true })
+  const glyphLilac = new THREE.MeshPhysicalMaterial({ color: '#d8bde9', metalness: .25, roughness: .3, clearcoat: .3, dithering: true, transparent: true })
+  const glyphPrism = new THREE.MeshPhysicalMaterial({ color: '#f5dbff', metalness: .2, roughness: .2, clearcoat: .7, emissive: '#a76fe0', emissiveIntensity: .12, dithering: true, transparent: true })
+  const letterCanvas = document.createElement('canvas')
+  letterCanvas.width = letterCanvas.height = 512
+  const letterContext = letterCanvas.getContext('2d')!
+  letterContext.fillStyle = '#e0c9f0'
+  letterContext.textAlign = 'center'
+  letterContext.font = '500 43px Arial, sans-serif'
+  letterContext.letterSpacing = '5px'
+  ;['CREATE', 'CONNECT', 'GROW'].forEach((line, i) => letterContext.fillText(line, 256, 191 + i * 65))
+  const letterTexture = new THREE.CanvasTexture(letterCanvas)
+  letterTexture.colorSpace = THREE.SRGBColorSpace
+  letterTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
+  const letterMaterial = new THREE.MeshBasicMaterial({ map: letterTexture, transparent: true, depthWrite: false, toneMapped: false })
   const icons = makeMusicIcons()
   // Evenly tessellated superellipsoids have continuous curvature across the face,
   // not just beveled corners. Analytic normals keep moving highlights smooth.
@@ -129,7 +139,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     return geometry
   }
   const prototypes: Record<Form, THREE.BufferGeometry> = {
-    tile: pillow(1.55, 1.55, 1.3, 3.6),
+    tile: pillow(1.6, 1.6, 1.35, 3.8),
     capsule: pillow(1.48, 1.88, 1.32, 2.8),
     ring: new THREE.TorusGeometry(.64, .26, 24, 64),
     disc: new THREE.SphereGeometry(.8, 40, 24),
@@ -141,7 +151,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     geometry.scale(scale, scale, scale)
     geometry.computeBoundingBox()
   })
-  const smallTile = pillow(1.55, 1.55, 1.3, 3.6, 12)
+  const smallTile = pillow(1.6, 1.6, 1.35, 3.8, 12)
   smallTile.computeBoundingSphere()
   const satelliteScale = 1 / smallTile.boundingSphere!.radius
   smallTile.scale(satelliteScale, satelliteScale, satelliteScale)
@@ -188,18 +198,25 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     object.add(mesh)
     meshes.push(mesh)
     if (piece.icon) {
-      const material = piece.finish === 'ink' ? glyphLilac : piece.finish === 'pearl' || piece.finish === 'glass' ? glyphDark : glyphLight
+      const material = piece.finish === 'glass' ? glyphPrism : piece.finish === 'ink' ? glyphLilac : piece.finish === 'pearl' ? glyphDark : glyphLight
       const glyphGeometry = icons[piece.icon].clone()
       const glyph = new THREE.Mesh(glyphGeometry, material)
       geometries.push(glyphGeometry)
-      glyph.scale.setScalar(piece.form === 'capsule' ? .82 : .96)
-      glyph.position.z = geometry.boundingBox!.max.z + .014
+      glyph.scale.setScalar(index === 0 ? 1.06 : .84)
+      glyph.position.z = geometry.boundingBox!.max.z + .024
       object.add(glyph)
+    }
+    if (piece.lettering) {
+      const letterGeometry = new THREE.PlaneGeometry(1.1, 1.1)
+      geometries.push(letterGeometry)
+      const lettering = new THREE.Mesh(letterGeometry, letterMaterial)
+      lettering.position.z = geometry.boundingBox!.max.z + .012
+      object.add(lettering)
     }
     object.scale.setScalar(piece.r)
     cluster.add(object)
     const home = new THREE.Vector3(...piece.p)
-    if (index < 25) { home.x *= .92; home.y *= .85; home.z *= 1.18 }
+    if (index < 22) { home.x *= .94; home.y *= .9; home.z *= 1.1 }
     const rest = new THREE.Quaternion().setFromEuler(new THREE.Euler(...(piece.tilt ?? [.2, .2, .2])))
     bodies.push({ home, rest, object, position: home.clone(), previous: home.clone(), velocity: new THREE.Vector3(), rotation: rest.clone(), spin: new THREE.Vector3(), radius: piece.r, mass: piece.r ** 3, phase: random() * Math.PI * 2 })
   })
@@ -292,6 +309,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   }
 
   const updateInstances = (alpha = 1) => {
+    orbits.update(elapsed)
     cluster.rotation.y = Math.sin(elapsed * .14) * .025
     cluster.rotation.z = Math.sin(elapsed * .2) * .014
     cluster.updateMatrixWorld(true)
@@ -330,7 +348,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     if (!width || !height) return
     const aspect = width / height
     mobile = width < 768
-    const viewHeight = mobile ? Math.max(8.2, 8.8 / aspect) : Math.max(8.5, 13.8 / aspect)
+    const viewHeight = mobile ? Math.max(8.2, 8.8 / aspect) : Math.max(8.2, 13.8 / aspect)
     camera.left = -viewHeight * aspect / 2
     camera.right = viewHeight * aspect / 2
     camera.top = viewHeight / 2
@@ -469,7 +487,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       smallTile.dispose()
       Object.values(icons).forEach(geometry => geometry.dispose())
       Object.values(finishes).forEach(material => material.dispose())
-      glyphDark.dispose(); glyphLight.dispose(); glyphLilac.dispose(); studio.dispose()
+      glyphDark.dispose(); glyphLight.dispose(); glyphLilac.dispose(); glyphPrism.dispose()
+      letterMaterial.dispose(); letterTexture.dispose(); orbits.dispose(); studio.dispose()
       contactLighting.dispose()
       renderer.dispose()
       renderer.domElement.remove()

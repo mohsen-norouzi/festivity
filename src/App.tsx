@@ -1,3 +1,6 @@
+import waveIcon from './assets/icons/waveform.svg'
+import noteIcon from './assets/icons/music-notes-fill.svg'
+import heartIcon from './assets/icons/heart-fill.svg'
 import { useEffect, useRef, useState } from 'react'
 import { createOrnamentScene } from './scene'
 import type { OrnamentScene } from './scene'
@@ -84,7 +87,7 @@ export default function App() {
   }
 
   return (
-    <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''}`}>
+    <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''}`}>
       <div ref={host} className="scene absolute inset-0" role="img" aria-label="A floating sculpture of glass, ceramic, and satin music tiles in coral, lilac, pearl, and midnight blue. Move through the shapes or drag one to explore." />
       <div className="grain pointer-events-none absolute inset-0" aria-hidden="true" />
       <div ref={cursor} className="scene-cursor pointer-events-none" aria-hidden="true"><span /></div>
@@ -117,6 +120,21 @@ export default function App() {
         <p className="desktop-hint">DRAG CURSOR TO INTERACT</p>
         <p className="touch-hint">TOUCH &amp; DRAG TO INTERACT</p>
         <span className={paused ? 'status-dot is-paused' : 'status-dot'} />
+      </div>
+
+      <div className="floating-card community-card" aria-label="Artists and fans, closer through music">
+        <div className="avatar-pair" aria-hidden="true"><span><img src={noteIcon} alt="" /></span><span><img src={heartIcon} alt="" /></span></div>
+        <p><strong>Artists × fans</strong><span>Closer through music</span></p>
+      </div>
+      <button className="floating-card explore-card" onClick={scatter} aria-label="Remix the composition">
+        <img className="card-wave" src={waveIcon} alt="" />
+        <p><strong>Explore the sound</strong><span>Remix the composition</span></p>
+        <span className="card-action" aria-hidden="true">↗</span>
+      </button>
+      <div className="floating-card together-card">
+        <span className="connection-mark" aria-hidden="true"><i /><i /><i /></span>
+        <p><strong>Independent.</strong><span>Together.</span></p>
+        <span className="together-star" aria-hidden="true">✳</span>
       </div>
 
       <button className="large-x display-font absolute z-10" onClick={scatter} aria-label="Scatter the shapes" title="Scatter the shapes">M</button>
