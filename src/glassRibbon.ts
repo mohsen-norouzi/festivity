@@ -65,7 +65,7 @@ export function createRibbonGeometry(nodes: THREE.Vector3[]) {
     }
   }
   glass.setIndex(indices); lettering.setIndex(textIndices); edges.setIndex(edgeIndices)
-  const warm = new THREE.Color('#ffa8c6'), cool = new THREE.Color('#a9a1ff'), color = new THREE.Color()
+  const warm = new THREE.Color('#b68164'), cool = new THREE.Color('#96aabb'), color = new THREE.Color()
   let uvReady = false
   const update = (reveal = 1) => {
     for (let i = 0; i < SEGMENTS; i++) curve.getPoint(i / SEGMENTS, centers[i])
@@ -118,12 +118,12 @@ async function inscription(anisotropy: number) {
   const canvas = document.createElement('canvas')
   canvas.width = 1536; canvas.height = 128
   const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#fff8ff'
-  ctx.font = '500 70px Arial, sans-serif'
+  ctx.fillStyle = '#eee1d0'
+  ctx.font = '500 62px Arial, sans-serif'
   ctx.textBaseline = 'middle'
   ctx.textAlign = 'center'
   ctx.letterSpacing = '2px'
-  ctx.fillText('MUSIC MOVES PEOPLE', 663, 67)
+  ctx.fillText('ARTISTS OWN TOMORROW', 663, 67)
   // Keep the original inscription layout; only the separator changes to the
   // official MUSYNC symbol, baked into the existing texture without a wordmark.
   const logoHeight = 88
@@ -142,31 +142,30 @@ export function createGlassRibbon(parent: THREE.Group, anisotropy: number) {
   const geometry = createRibbonGeometry(nodes)
   let texture: THREE.CanvasTexture | undefined
   const group = new THREE.Group()
-  group.name = 'Glass inscription ribbon'
+  group.name = 'Smoked inscription ribbon'
   parent.add(group)
   const glassMaterial = new THREE.MeshPhysicalMaterial({
-    color: '#fff5ff', vertexColors: true, roughness: .16, metalness: .12,
+    color: '#252628', vertexColors: true, roughness: .28, metalness: .35,
     ior: 1.46, transparent: true, opacity: .3, depthWrite: false,
-    clearcoat: 1, clearcoatRoughness: .12, envMapIntensity: 1.35,
-    iridescence: .22, iridescenceIOR: 1.3, iridescenceThicknessRange: [160, 320],
+    clearcoat: .75, clearcoatRoughness: .2, envMapIntensity: 1.35,
+    iridescence: .05, iridescenceIOR: 1.3, iridescenceThicknessRange: [160, 320],
     dithering: true,
   })
   const visibility = { value: 0 }
-  // A thin optical film reflects at grazing angles and transmits straight
-  // through its center. Alpha compositing preserves the glass cubes underneath
-  // without another scene capture or Three's nested-transmission artifacts.
+  // Smoked lacquer stays readable against the venue; the slim polished rim
+  // catches stage light without another transmission capture.
   glassMaterial.onBeforeCompile = shader => {
     shader.uniforms.ribbonVisibility = visibility
     shader.fragmentShader = `uniform float ribbonVisibility;\n${shader.fragmentShader}`.replace('#include <opaque_fragment>', `
       float ribbonFresnel = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3.0);
-      diffuseColor.a = mix(0.20, 0.86, ribbonFresnel) * ribbonVisibility;
+      diffuseColor.a = mix(0.90, 0.98, ribbonFresnel) * ribbonVisibility;
       #include <opaque_fragment>
     `)
   }
-  glassMaterial.customProgramCacheKey = () => 'thin-glass-ribbon-v1'
+  glassMaterial.customProgramCacheKey = () => 'smoked-ribbon-v2'
   const textMaterial = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, opacity: .88 })
   textMaterial.forceSinglePass = true
-  const edgeMaterial = new THREE.MeshPhysicalMaterial({ color: '#ffe4f7', metalness: .55, roughness: .22, clearcoat: .8, envMapIntensity: 1.6, transparent: true, opacity: .7, depthWrite: false, dithering: true })
+  const edgeMaterial = new THREE.MeshPhysicalMaterial({ color: '#d5b29b', metalness: .7, roughness: .24, clearcoat: .8, envMapIntensity: 1.6, transparent: true, opacity: .7, depthWrite: false, dithering: true })
   const slices: THREE.BufferGeometry[] = []
   // Separate draw ranges give the near/far arcs correct depth ordering relative
   // to the existing glass cubes, while sharing all vertex buffers.

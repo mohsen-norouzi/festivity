@@ -25,6 +25,8 @@ export function createBurstEffects(parent: THREE.Group, finishes: Record<string,
     geometry.setAttribute('surfaceShape', shapeAttribute)
     const material = new THREE.MeshPhysicalMaterial().copy(source)
     material.color.set('#ffffff')
+    // Painted surface wear belongs to the shell, not to its liquid droplets.
+    material.map = material.roughnessMap = material.bumpMap = material.normalMap = material.clearcoatRoughnessMap = null
     material.metalness = 0
     material.roughness = name === 'ink' ? .17 : .13
     material.clearcoat = .45; material.clearcoatRoughness = .11
@@ -33,6 +35,7 @@ export function createBurstEffects(parent: THREE.Group, finishes: Record<string,
     material.thickness = .22
     material.iridescence = Math.min(.16, source.iridescence)
     material.attenuationColor.copy(source.color)
+    if (source.userData.liquidColor) material.attenuationColor.set(source.userData.liquidColor)
     material.attenuationDistance = .8
     material.envMapIntensity = 1.05
     material.dithering = true
@@ -102,6 +105,7 @@ export function createBurstEffects(parent: THREE.Group, finishes: Record<string,
   const burst = (source: Omit<BurstSource, 'color'>) => {
     const material = finishes[source.finish]
     tint.copy(material.color)
+    if (material.userData.liquidColor) tint.set(material.userData.liquidColor)
     if (material.transmission > 0 && Number.isFinite(material.attenuationDistance)) tint.lerp(material.attenuationColor, .45)
     dynamics.burst({ ...source, color: tint })
   }

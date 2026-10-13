@@ -108,8 +108,8 @@ export default function App() {
   }
 
   return (
-    <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''} ${music.audible ? 'is-music-playing' : ''} ${song ? 'has-music' : ''}`} style={{ '--mood-accent': song?.accent ?? '#e5c4ff' } as CSSProperties}>
-      <div ref={host} className="scene absolute inset-0" role="img" aria-label="An interactive sculpture of glass bubbles and music tiles. Click a shape once to play its music and inflate it until it pops. Repeated clicks keep the music playing; another shape selects its track. Drag to move; a matching replacement floats in." />
+    <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''} ${music.audible ? 'is-music-playing' : ''} ${song ? 'has-music' : ''}`} style={{ '--mood-accent': song?.accent ?? '#f1996a' } as CSSProperties}>
+      <div ref={host} className="scene absolute inset-0" role="img" aria-label="An underground music sculpture of smoked glass, worn paint, and music tiles. Click a shape once to play its music and inflate it until it pops. Repeated clicks keep the music playing; another shape selects its track. Drag to move; a matching replacement floats in." />
       <div className="grain pointer-events-none absolute inset-0" aria-hidden="true" />
       <div ref={cursor} className="scene-cursor pointer-events-none" aria-hidden="true"><span /></div>
 
@@ -154,8 +154,9 @@ export default function App() {
       </div>}
 
       <div className="study-caption absolute z-10 pointer-events-none">
-        <h1>Take your fans into<br /><span>a new reality.</span></h1>
+        <h1>THE MUSIC<br /><span>IS OURS.</span></h1>
         <span className="caption-dash" />
+        <p className="caption-manifesto">ARTISTS FIRST.<br />ALWAYS.</p>
       </div>
 
       <div className="interaction-label absolute z-10 pointer-events-none">
@@ -191,7 +192,7 @@ export default function App() {
 
       <footer className="hero-footer absolute inset-x-0 bottom-0 z-20 flex items-end justify-between">
         <div className="material-caption"><p className="font-semibold">No middlemen.</p><p>Closer to your fans.</p></div>
-        <p className="hero-title">ANYWHERE. FOR ANYONE.</p>
+        <p className="hero-title">MUSIC, IN MOTION.</p>
         <div className="rotation-note">
           <span className="rotation-record" aria-hidden="true"><span /><i /></span>
           <div className="rotation-copy">

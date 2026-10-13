@@ -45,7 +45,7 @@ export function createOrbits(parent: THREE.Group, anisotropy = 1) {
   geometry.setAttribute('position', positionAttribute)
   geometry.setAttribute('normal', normalAttribute)
   geometry.setIndex(indices)
-  const material = new THREE.MeshPhysicalMaterial({ color: '#dfd2ee', metalness: .68, roughness: .27, envMapIntensity: 1.4, clearcoat: .35, dithering: true })
+  const material = new THREE.MeshPhysicalMaterial({ color: '#8d8178', metalness: .75, roughness: .27, envMapIntensity: 1.4, clearcoat: .35, dithering: true })
   const orbit = new THREE.Mesh(geometry, material)
   orbit.frustumCulled = false
   group.add(orbit)
@@ -58,7 +58,7 @@ export function createOrbits(parent: THREE.Group, anisotropy = 1) {
   const up = new THREE.Vector3(0, 1, 0)
 
   const bubbleGeometry = new THREE.SphereGeometry(1, 32, 24)
-  const bubbleMaterial = new THREE.MeshPhysicalMaterial({ color: '#f7efff', roughness: .065, metalness: 0, transmission: .92, thickness: .3, ior: 1.34, iridescence: .8, iridescenceIOR: 1.3, iridescenceThicknessRange: [100, 410], clearcoat: 1, clearcoatRoughness: .08, envMapIntensity: 1.8, dithering: true })
+  const bubbleMaterial = new THREE.MeshPhysicalMaterial({ color: '#edd8c4', roughness: .065, metalness: 0, transmission: .92, thickness: .3, ior: 1.34, iridescence: .18, iridescenceIOR: 1.3, iridescenceThicknessRange: [100, 410], clearcoat: 1, clearcoatRoughness: .08, envMapIntensity: 1.25, dithering: true })
   const bubbles = new THREE.InstancedMesh(bubbleGeometry, bubbleMaterial, bubblePhysics.bodies.length)
   bubbles.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
   bubbles.frustumCulled = false

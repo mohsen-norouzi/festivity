@@ -2,7 +2,7 @@ import * as THREE from 'three'
 
 export function createStudio(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
   const studio = new THREE.Scene()
-  studio.background = new THREE.Color('#252b46')
+  studio.background = new THREE.Color('#0c1014')
   const panelGeometry = new THREE.PlaneGeometry(1, 1)
   const panels: THREE.MeshBasicMaterial[] = []
   const lightCanvas = document.createElement('canvas')
@@ -26,59 +26,56 @@ export function createStudio(renderer: THREE.WebGLRenderer, scene: THREE.Scene) 
     studio.add(mesh)
     panels.push(material)
   }
-  panel('#fff2e5', 13, [-3, 5, 2], [6, 5])
-  panel('#cbd7ff', 10, [4, 2, 1], [4, 7])
-  panel('#ffa98e', 17, [-4, -2, 0], [5, 6])
-  panel('#f7dcff', 8, [0, 5, -4], [7, 3])
-  panel('#91bbff', 10, [3, -3, -2], [4, 4])
+  panel('#ffdecb', 9, [-3, 5, 2], [5, 4])
+  panel('#a5c5e0', 7, [4, 2, 1], [3, 6])
+  panel('#ff531b', 19, [-4, -2, 1], [3, 7])
+  panel('#d65895', 7, [1, 5, -4], [5, 2])
+  panel('#f77632', 7, [0, -4, 2], [5, 1])
   const generator = new THREE.PMREMGenerator(renderer)
   const environment = generator.fromScene(studio, .025)
   scene.environment = environment.texture
-  scene.environmentIntensity = .8
+  scene.environmentIntensity = .72
   generator.dispose()
   panelGeometry.dispose()
   softbox.dispose()
   panels.forEach(material => material.dispose())
 
   const canvas = document.createElement('canvas')
-  canvas.width = 1536; canvas.height = 1024
   const context = canvas.getContext('2d')!
-  const base = context.createLinearGradient(0, 0, 1536, 1000)
-  base.addColorStop(0, '#343755')
-  base.addColorStop(.42, '#686584')
-  base.addColorStop(.7, '#565d83')
-  base.addColorStop(1, '#303750')
-  context.fillStyle = base; context.fillRect(0, 0, canvas.width, canvas.height)
-  const glow = (x: number, y: number, radius: number, color: string) => {
-    const gradient = context.createRadialGradient(x, y, 0, x, y, radius)
-    gradient.addColorStop(0, color); gradient.addColorStop(1, 'rgba(0,0,0,0)')
-    context.fillStyle = gradient; context.fillRect(x - radius, y - radius, radius * 2, radius * 2)
-  }
-  glow(1410, 30, 800, 'rgba(218,190,224,.82)')
-  glow(900, 380, 630, 'rgba(156,150,204,.48)')
-  glow(80, 680, 690, 'rgba(231,148,159,.52)')
-  glow(470, 930, 600, 'rgba(238,155,159,.44)')
-  glow(1070, 920, 670, 'rgba(113,146,224,.4)')
-  const streak = (x: number, y: number, width: number, height: number, angle: number, color: string) => {
-    context.save()
-    context.translate(x, y); context.rotate(angle); context.scale(1, height / width)
-    glow(0, 0, width, color)
-    context.restore()
-  }
-  streak(570, 920, 940, 44, -.2, 'rgba(255,184,166,.48)')
-  streak(180, 535, 620, 82, -.35, 'rgba(255,168,171,.35)')
-  streak(1350, 45, 720, 58, -.56, 'rgba(245,190,222,.35)')
-  streak(1190, 915, 490, 92, .13, 'rgba(162,183,246,.23)')
   const background = new THREE.CanvasTexture(canvas)
   background.colorSpace = THREE.SRGBColorSpace
   scene.background = background
+  let aspect = 16 / 9, disposed = false, loaded = false
+  const photo = new Image()
+  const paint = () => {
+    // Canvas dimensions may change at a breakpoint; release the old GPU storage.
+    background.dispose()
+    canvas.width = aspect >= 1 ? 1920 : Math.round(1200 * aspect)
+    canvas.height = aspect >= 1 ? Math.round(1920 / aspect) : 1200
+    context.fillStyle = '#0d1115'; context.fillRect(0, 0, canvas.width, canvas.height)
+    if (loaded) {
+      const scale = Math.max(canvas.width / photo.width, canvas.height / photo.height)
+      context.filter = 'blur(.7px)'
+      context.drawImage(photo, (canvas.width - photo.width * scale) * (aspect < 1 ? .38 : .5), (canvas.height - photo.height * scale) / 2, photo.width * scale, photo.height * scale)
+      context.filter = 'none'
+      context.fillStyle = 'rgba(5,7,9,.17)'; context.fillRect(0, 0, canvas.width, canvas.height)
+    }
+    const shade = context.createLinearGradient(0, 0, 0, canvas.height)
+    shade.addColorStop(0, 'rgba(4,6,8,.25)'); shade.addColorStop(.2, 'rgba(4,6,8,0)')
+    shade.addColorStop(.73, 'rgba(4,6,8,0)'); shade.addColorStop(1, 'rgba(4,6,8,.68)')
+    context.fillStyle = shade; context.fillRect(0, 0, canvas.width, canvas.height)
+    background.needsUpdate = true
+  }
+  photo.onload = () => { if (!disposed) { loaded = true; paint() } }
+  photo.src = '/textures/underground-club.webp'
+  paint()
 
-  scene.add(new THREE.HemisphereLight('#eddefa', '#edaca2', .5))
-  const key = new THREE.DirectionalLight('#ffece2', 2.5)
+  scene.add(new THREE.HemisphereLight('#b8c4cc', '#341810', .35))
+  const key = new THREE.DirectionalLight('#ffe0c9', 2.1)
   key.position.set(-3, 5, 4); scene.add(key)
-  const cool = new THREE.DirectionalLight('#b8d2ff', 1.3)
+  const cool = new THREE.DirectionalLight('#a9c8e0', 1.2)
   cool.position.set(4, 2, 2); scene.add(cool)
-  const bounce = new THREE.DirectionalLight('#ff9f70', 2.0)
+  const bounce = new THREE.DirectionalLight('#ff501b', 2.3)
   bounce.position.set(-4, -3, 1); scene.add(bounce)
-  return { background, dispose() { environment.dispose(); background.dispose() } }
+  return { background, resize(nextAspect: number) { if (Math.abs(aspect - nextAspect) > .001) { aspect = nextAspect; paint() } }, dispose() { disposed = true; photo.onload = null; environment.dispose(); background.dispose() } }
 }

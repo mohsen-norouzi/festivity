@@ -1,6 +1,6 @@
 # Festivity — MUSYNC hero study
 
-A local, single-hero React and Three.js experiment using MUSYNC’s official logo and core messaging. The workspace/project name remains Festivity. A floating sculpture of rounded music tiles, capsules, small satellites, a reflective orbit, and iridescent bubbles. Three tiny transparent glass capsules sit within the same hero: artist–fan details, a random-track discovery button, and the MUSYNC waitlist invitation. Coral ceramic, lilac, pearl, periwinkle, dark satin, and refractive glass sit against a warm-to-cool studio backdrop. No extra pages or deployment.
+A local, single-hero React and Three.js experiment using MUSYNC’s official logo and core messaging. The workspace/project name remains Festivity. A floating sculpture of rounded music tiles, capsules, small satellites, a reflective orbit, and iridescent bubbles. Three tiny transparent glass capsules sit within the same hero: artist–fan details, a random-track discovery button, and the MUSYNC waitlist invitation. Scuffed black lacquer, vermilion paint, acid pink, aged paper, gunmetal, and smoky glass sit against a photographic underground venue. The official symbol, distressed manifesto lettering, a live-session image, and a vinyl record appear on the rounded faces. The dark inscription ribbon reads “ARTISTS OWN TOMORROW.” No extra pages or deployment.
 
 ## Run
 
@@ -34,10 +34,11 @@ bun run preview
 - `src/scene.ts`: 26 physical bodies, fixed 90 Hz simulation, interpolated motion, smooth superellipsoid geometry with analytic normals, and physical materials.
 - `src/musicAudio.ts` and `src/musicMoods.ts`: seven local MP3 recordings, streamed only after a click. At most two media sources are alive during a crossfade; replaced sources release their downloads and buffers. Pause/resume preserves position, and the actual recording's energy and bass attacks drive the reactions. The footer shows the track title and artist; the menu can pause/resume playback, while cubes always select and play.
 - `src/tileReactions.ts`: per-symbol reactions, including single-draw equalizer geometry and isolated heart materials. Heartbeat scale is shared by rendered geometry and physical colliders.
-- `src/musicVisuals.ts`: a gently animated background palette. A small half-float background texture updates at 30 Hz; the sculpture stays at the display rate. Audio energy drives restrained atmosphere changes without a bloom pass. Pausing the soundtrack also stops its reactions.
+- `src/musicVisuals.ts`: restrained moving stage light over the venue photograph. A capped half-float background texture updates at 30 Hz; the sculpture stays at the display rate. Audio energy drives restrained atmosphere changes without a bloom pass. Pausing the soundtrack also stops its reactions.
+- `src/undergroundSurfaces.ts`: shared 512px color, roughness, and bump textures baked once; curved artwork decals; local generated concert photography. No per-frame texture generation.
 - `src/musicIcons.ts`: beveled music symbols from official Phosphor SVG contours and the Lucide cloud silhouette. Icons render after transmission to avoid ghosted refraction.
 - `src/orbits.ts`: a dynamically updated cable mesh with continuous transported normals, plus five instanced iridescent glass bubbles.
-- `src/studio.ts`: a baked studio environment, feathered softboxes, and a procedural gradient backdrop with soft diagonal light streaks.
+- `src/studio.ts`: a baked orange/steel-blue lighting environment and a responsive, cropped venue backdrop. The background texture reallocates safely on resize.
 - `src/wirePhysics.ts`: a 96-node closed cable with stretch/bending constraints, a weak rest spring, traveling loads, and two-way rounded-cube contact at the same 90 Hz fixed step. Node and segment contacts keep the wire outside the cube surfaces.
 - `src/burstLifecycle.ts`: single-click continuous inflation, independent body countdowns, one pop per cycle, and matching replacements.
 - `src/liquidCollision.ts`: continuous oil contacts against translating and rotating rounded bodies, including drop width and full liquid strands. Oil and cubes share the fixed simulation step.
@@ -61,14 +62,18 @@ The uploaded recordings live in `public/songs/`. Assignments and displayed metad
 
 | Material | Track | Artist |
 | --- | --- | --- |
-| Coral | Sunshine | Moavii |
+| Vermilion (coral ID) | Sunshine | Moavii |
 | Black | Wavy Strut | Tetuano |
-| Lilac | Pink Clouds | NVL8 |
-| Pearl | Enjoy | Pufino |
+| Acid pink (lilac ID) | Pink Clouds | NVL8 |
+| Aged paper (pearl ID) | Enjoy | Pufino |
 | Glass | That's Life | Johny Grimes |
-| Blue | Back To Promise | Unheard |
+| Gunmetal (blue ID) | Back To Promise | Unheard |
 | Small bubbles | Tariro | Pufino |
 
 ## Brand source
 
-The full white SVG logo is from https://www.musync.me/assets/Logo_White.svg; the standalone symbol uses its original first path. The favicon and headline are from https://www.musync.me/en/. Public brand assets are stored in `public/brand/`. The existing hero CTA opens the live MUSYNC waitlist in a new tab; no signup form or additional section is included locally.
+The full white SVG logo is from https://www.musync.me/assets/Logo_White.svg; the standalone symbol uses its original first path. The favicon is from https://www.musync.me/en/. The underground manifesto and tile phrases follow the supplied design reference. Public brand assets are stored in `public/brand/`. The existing hero CTA opens the live MUSYNC waitlist in a new tab; no signup form or additional section is included locally.
+
+## Underground assets
+
+`public/textures/underground-club.webp` (1920px wide, about 151 KB) and `public/textures/live-session.webp` (768px square, about 26 KB) were generated with the built-in image generation tool for this experiment. The anonymous concert subject is generated. Existing official brand vectors are retained. Surface wear, vinyl artwork, and typography are procedural.

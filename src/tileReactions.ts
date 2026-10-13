@@ -20,7 +20,7 @@ export function createTileReactions(kinds: readonly ReactionKind[]) {
   const entries: Entry[] = kinds.map(kind => ({ kind, amount: 0, scale: 1 }))
   const materials: GlyphMaterial[] = []
   const gold = new THREE.Color('#f9cc70'), goldLight = new THREE.Color('#ffe7a4')
-  const rose = new THREE.Color('#ef6f9a'), apricot = new THREE.Color('#ffb083'), heartTone = new THREE.Color()
+  const rose = new THREE.Color('#d52957'), apricot = new THREE.Color('#ff6029'), heartTone = new THREE.Color()
   const ivory = new THREE.Color('#fff1e2'), ice = new THREE.Color('#b8dbff')
   let time = 0, phase = 0
   return {

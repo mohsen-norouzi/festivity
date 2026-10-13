@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { createMusicIcons, type MusicIcon } from './musicIcons'
 import { createStudio } from './studio'
+import { createUndergroundSurfaces, type TileArtwork } from './undergroundSurfaces'
 import { createOrbits } from './orbits'
 import { createContactLighting } from './contactLighting'
 import { createBurstLifecycle } from './burstLifecycle'
@@ -41,21 +42,21 @@ interface Body {
 
 type Finish = 'ink' | 'coral' | 'lilac' | 'pearl' | 'glass' | 'blue'
 type Form = 'tile' | 'capsule'
-interface Piece { p: [number, number, number]; r: number; finish: Finish; icon?: MusicIcon; lettering?: readonly string[]; form?: Form; tilt?: [number, number, number] }
+interface Piece { p: [number, number, number]; r: number; finish: Finish; icon?: MusicIcon; artwork?: TileArtwork; lettering?: readonly string[]; form?: Form; tilt?: [number, number, number] }
 const pieces: Piece[] = [
-  { p: [-.46, .22, 2.8], r: 1.38, finish: 'glass', icon: 'wave', tilt: [.12, -.22, .24] },
-  { p: [-2.22, .6, 1.83], r: 1.01, finish: 'pearl', icon: 'pause', tilt: [.16, .22, -.25] },
-  { p: [-1.3, 1.86, .65], r: 1.01, finish: 'ink', icon: 'note', tilt: [.12, -.23, -.32] },
+  { p: [-.46, .22, 2.8], r: 1.38, finish: 'glass', artwork: 'live', tilt: [.12, -.22, .24] },
+  { p: [-2.22, .6, 1.83], r: 1.01, finish: 'pearl', artwork: 'poster', tilt: [.16, .22, -.25] },
+  { p: [-1.3, 1.86, .65], r: 1.01, finish: 'ink', lettering: ['GOOD', 'MUSIC', 'PEOPLE'], tilt: [.12, -.23, -.32] },
   { p: [.61, -1.45, 2.31], r: 1.02, finish: 'coral', icon: 'heart', tilt: [.15, .2, -.23] },
-  { p: [1.24, 1.7, .9], r: .94, finish: 'pearl', icon: 'wave', tilt: [.17, -.15, .2] },
+  { p: [1.24, 1.7, .9], r: .94, finish: 'lilac', artwork: 'brand', tilt: [.17, -.15, .2] },
   { p: [1.62, .22, 2.05], r: .92, finish: 'glass', icon: 'headphones', tilt: [.12, -.32, .23] },
-  { p: [2.89, -.28, 1.37], r: 1.04, finish: 'ink', lettering: ['REAL-TIME', 'ROYALTIES'], tilt: [.15, -.23, .3] },
-  { p: [2.32, -1.85, 1.02], r: .98, finish: 'blue', icon: 'cloud', tilt: [.12, -.25, .22] },
-  { p: [-2.24, -1.1, 1.3], r: .88, finish: 'ink', lettering: ['DIRECT', 'TO FAN'], tilt: [.14, .15, -.25] },
-  { p: [-1.15, -2.03, 1.7], r: .7, finish: 'glass', icon: 'sparkle', tilt: [.13, .2, -.3] },
+  { p: [2.89, -.28, 1.37], r: 1.04, finish: 'ink', icon: 'wave', tilt: [.15, -.23, .3] },
+  { p: [2.32, -1.85, 1.02], r: .98, finish: 'coral', lettering: ['OWN', 'YOUR', 'SOUND'], tilt: [.12, -.25, .22] },
+  { p: [-2.24, -1.1, 1.3], r: .88, finish: 'ink', icon: 'globe', tilt: [.14, .15, -.25] },
+  { p: [-1.15, -2.03, 1.7], r: .7, finish: 'glass', artwork: 'vinyl', tilt: [.13, .2, -.3] },
   { p: [-3.06, -.1, -.4], r: .92, finish: 'lilac', form: 'capsule', tilt: [.25, .22, -.12] },
   { p: [.05, 2.44, -.4], r: .7, finish: 'coral', icon: 'sparkle', tilt: [.2, -.2, .28] },
-  { p: [2.3, 1.62, -.65], r: .86, finish: 'ink', lettering: ['NO', 'MIDDLEMEN'], tilt: [.2, .4, .28] },
+  { p: [2.3, 1.62, -.65], r: .86, finish: 'ink', icon: 'sparkle', tilt: [.2, .4, .28] },
   { p: [2.25, .6, -.48], r: .81, finish: 'blue', icon: 'play', tilt: [.2, -.3, .16] },
   { p: [3.09, .21, -.81], r: .77, finish: 'coral', tilt: [.2, .3, .3] },
   { p: [3.55, -.96, -.55], r: .61, finish: 'pearl', tilt: [.2, -.4, .35] },
@@ -90,7 +91,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   renderer.setClearColor(0x000000, 0)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = 1.04
+  renderer.toneMappingExposure = .95
   renderer.transmissionResolutionScale = .35
   renderer.outputColorSpace = THREE.SRGBColorSpace
   host.appendChild(renderer.domElement)
@@ -122,14 +123,17 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       host.dataset.musicAudible = String(state.audible)
     }
   })
+  const surfaces = createUndergroundSurfaces(renderer.capabilities.getMaxAnisotropy())
+  const patina = { roughnessMap: surfaces.roughness, clearcoatRoughnessMap: surfaces.roughness, bumpMap: surfaces.roughness, bumpScale: .007 }
   const finishes: Record<Finish, THREE.MeshPhysicalMaterial> = {
-    ink: new THREE.MeshPhysicalMaterial({ color: '#101421', roughness: .32, metalness: .08, clearcoat: .32, clearcoatRoughness: .32, envMapIntensity: .9 }),
-    coral: new THREE.MeshPhysicalMaterial({ color: '#f18f86', roughness: .28, metalness: 0, clearcoat: .62, clearcoatRoughness: .25, envMapIntensity: .9 }),
-    lilac: new THREE.MeshPhysicalMaterial({ color: '#af8aca', roughness: .29, metalness: .03, clearcoat: .45, clearcoatRoughness: .3, envMapIntensity: 1 }),
-    blue: new THREE.MeshPhysicalMaterial({ color: '#758ad1', roughness: .27, metalness: .035, clearcoat: .55, clearcoatRoughness: .28, envMapIntensity: .95 }),
-    pearl: new THREE.MeshPhysicalMaterial({ color: '#f1deda', roughness: .3, metalness: 0, clearcoat: .42, clearcoatRoughness: .26, envMapIntensity: .85 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: '#fff4fc', roughness: .18, metalness: 0, transmission: .94, thickness: .8, ior: 1.46, clearcoat: .85, clearcoatRoughness: .26, attenuationColor: '#cfaae9', attenuationDistance: 6, envMapIntensity: 1.1 }),
+    ink: new THREE.MeshPhysicalMaterial({ color: '#888580', map: surfaces.ink, ...patina, roughness: .36, metalness: .28, clearcoat: .6, clearcoatRoughness: .22, envMapIntensity: 1.1 }),
+    coral: new THREE.MeshPhysicalMaterial({ color: '#ed461c', map: surfaces.paint, ...patina, roughness: .38, metalness: .08, clearcoat: .48, clearcoatRoughness: .25, envMapIntensity: .9 }),
+    lilac: new THREE.MeshPhysicalMaterial({ color: '#d5379b', map: surfaces.paint, ...patina, roughness: .36, metalness: .1, clearcoat: .62, clearcoatRoughness: .22, envMapIntensity: 1 }),
+    blue: new THREE.MeshPhysicalMaterial({ color: '#394854', map: surfaces.paint, ...patina, roughness: .4, metalness: .4, clearcoat: .5, clearcoatRoughness: .24, envMapIntensity: 1.05 }),
+    pearl: new THREE.MeshPhysicalMaterial({ color: '#d8cbb8', map: surfaces.paper, ...patina, roughness: .49, metalness: .02, clearcoat: .35, clearcoatRoughness: .32, envMapIntensity: .85 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: '#e9d3bf', roughness: .14, metalness: .05, transmission: .9, thickness: .65, ior: 1.46, clearcoat: .8, clearcoatRoughness: .2, attenuationColor: '#ad7463', attenuationDistance: 7, envMapIntensity: 1.25 }),
   }
+  finishes.ink.userData.liquidColor = '#17191b'
   const burstEffects = createBurstEffects(cluster, { ...finishes, bubble: orbits.bubbleMesh.material })
   const contactLighting = createContactLighting(COUNT)
   Object.entries(finishes).forEach(([name, material]) => {
@@ -144,26 +148,30 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     music.select(mood)
   }
   // Transparent render queue excludes symbols from the glass refraction buffer.
-  const glyphDark = new THREE.MeshPhysicalMaterial({ color: '#192034', metalness: .2, roughness: .33, clearcoat: .22, dithering: true, transparent: true })
-  const glyphLight = new THREE.MeshPhysicalMaterial({ color: '#fff0f5', metalness: .08, roughness: .25, clearcoat: .45, dithering: true, transparent: true })
-  const glyphLilac = new THREE.MeshPhysicalMaterial({ color: '#d8bde9', metalness: .25, roughness: .3, clearcoat: .3, dithering: true, transparent: true })
-  const glyphPrism = new THREE.MeshPhysicalMaterial({ color: '#f5dbff', metalness: .2, roughness: .2, clearcoat: .7, emissive: '#a76fe0', emissiveIntensity: .12, dithering: true, transparent: true })
+  const glyphDark = new THREE.MeshPhysicalMaterial({ color: '#121416', metalness: .2, roughness: .33, clearcoat: .22, dithering: true, transparent: true })
+  const glyphLight = new THREE.MeshPhysicalMaterial({ color: '#f0dfc9', metalness: .08, roughness: .25, clearcoat: .45, dithering: true, transparent: true })
+  const glyphLilac = new THREE.MeshPhysicalMaterial({ color: '#d9c8b5', metalness: .25, roughness: .3, clearcoat: .3, dithering: true, transparent: true })
+  const glyphPrism = new THREE.MeshPhysicalMaterial({ color: '#f0d5b8', metalness: .2, roughness: .2, clearcoat: .7, emissive: '#cb6130', emissiveIntensity: .12, dithering: true, transparent: true })
+  const artworkMaterials: THREE.MeshPhysicalMaterial[] = []
   const letterTextures: THREE.CanvasTexture[] = []
   const letterMaterials: THREE.MeshBasicMaterial[] = []
-  const createLetterMaterial = (lines: readonly string[]) => {
+  const createLetterMaterial = (lines: readonly string[], dark: boolean) => {
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = 512
     const context = canvas.getContext('2d')!
     context.fillStyle = '#ffffff'
     context.textAlign = 'center'
-    context.font = '500 43px Arial, sans-serif'
-    context.letterSpacing = '5px'
+    context.font = '900 89px Arial, sans-serif'
+    context.letterSpacing = '-4px'
     context.textBaseline = 'middle'
-    lines.forEach((line, i) => context.fillText(line, 256, 256 + (i - (lines.length - 1) / 2) * 64))
+    lines.forEach((line, i) => context.fillText(line, 256, 256 + (i - (lines.length - 1) / 2) * 95))
+    context.globalCompositeOperation = 'destination-out'
+    const scuff = randomGenerator(12)
+    for (let i = 0; i < 850; i++) { context.fillStyle = `rgba(0,0,0,${scuff() * .8})`; context.fillRect(scuff() * 512, scuff() * 512, .6 + scuff() * 3, .5 + scuff()) }
     const texture = new THREE.CanvasTexture(canvas)
     texture.colorSpace = THREE.SRGBColorSpace
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
-    const material = new THREE.MeshBasicMaterial({ color: '#e0c9f0', map: texture, transparent: true, depthWrite: false, toneMapped: false })
+    const material = new THREE.MeshBasicMaterial({ color: dark ? '#141514' : '#e4d6c7', map: texture, transparent: true, depthWrite: false, toneMapped: false })
     letterTextures.push(texture); letterMaterials.push(material)
     return material
   }
@@ -263,7 +271,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     object.add(mesh)
     interactiveMeshes.push(mesh)
     if (piece.icon) {
-      const material = piece.finish === 'glass' ? glyphPrism : piece.finish === 'ink' ? glyphLilac : piece.finish === 'pearl' ? glyphDark : glyphLight
+      const material = piece.finish === 'glass' ? glyphPrism : piece.finish === 'ink' ? glyphLilac : ['pearl', 'coral', 'lilac'].includes(piece.finish) ? glyphDark : glyphLight
       // Share the immutable icon mesh data between tiles, and extrude on demand.
       const glyph = new THREE.Mesh(icons.get(piece.icon), material)
       glyph.scale.setScalar(index === 0 ? 1.06 : .84)
@@ -271,10 +279,25 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       object.add(glyph)
       reactions.register(index, glyph, piece.icon === 'heart' ? bodyMaterial : undefined)
     }
+    if (piece.artwork) {
+      const faceGeometry = new THREE.PlaneGeometry(1.23, 1.23, 24, 24)
+      const vertices = faceGeometry.getAttribute('position'), half = geometry.boundingBox!.max
+      for (let i = 0; i < vertices.count; i++) {
+        const x = vertices.getX(i), y = vertices.getY(i)
+        const z = half.z * Math.pow(Math.max(.001, 1 - Math.abs(x / half.x) ** 3.8 - Math.abs(y / half.y) ** 3.8), 1 / 3.8)
+        vertices.setZ(i, z + .009)
+      }
+      faceGeometry.computeVertexNormals(); geometries.push(faceGeometry)
+      const faceMaterial = new THREE.MeshPhysicalMaterial({ map: surfaces.face(piece.artwork), transparent: true, depthWrite: false, roughness: piece.artwork === 'poster' ? .58 : .26, metalness: 0, clearcoat: piece.artwork === 'poster' ? .1 : .65, clearcoatRoughness: .22, envMapIntensity: .35 })
+      artworkMaterials.push(faceMaterial)
+      const face = new THREE.Mesh(faceGeometry, faceMaterial)
+      object.add(face)
+      reactions.register(index, face)
+    }
     if (piece.lettering) {
       const letterGeometry = new THREE.PlaneGeometry(1.1, 1.1)
       geometries.push(letterGeometry)
-      const lettering = new THREE.Mesh(letterGeometry, createLetterMaterial(piece.lettering))
+      const lettering = new THREE.Mesh(letterGeometry, createLetterMaterial(piece.lettering, piece.finish === 'coral'))
       lettering.position.z = geometry.boundingBox!.max.z + .012
       object.add(lettering)
       reactions.register(index, lettering)
@@ -489,6 +512,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     const { width, height } = host.getBoundingClientRect()
     if (!width || !height) return
     const aspect = width / height
+    studio.resize(aspect)
     musicVisuals.resize(aspect)
     mobile = width < 768
     const viewHeight = mobile ? Math.max(8.2, 8.8 / aspect) : Math.max(8.2, 13.8 / aspect)
@@ -790,6 +814,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     smallTile.dispose(); icons.dispose()
     Object.values(finishes).forEach(material => material.dispose())
     glyphDark.dispose(); glyphLight.dispose(); glyphLilac.dispose(); glyphPrism.dispose()
+    artworkMaterials.forEach(material => material.dispose())
+    surfaces.dispose()
     letterMaterials.forEach(material => material.dispose())
     letterTextures.forEach(texture => texture.dispose())
     orbits.dispose(); studio.dispose()

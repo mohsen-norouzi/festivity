@@ -3,7 +3,7 @@ import { MUSIC_MOODS, type MoodId } from './musicMoods'
 
 /** Small cached atmosphere texture; no bloom or environment rebakes. */
 export function createMusicVisuals(scene: THREE.Scene, baseline: THREE.Texture) {
-  const targets = ['#292644', '#66638f', '#bfa9dc', '#90c3df'].map(color => new THREE.Color(color))
+  const targets = ['#0b0e11', '#39251f', '#ff602c', '#7199b6'].map(color => new THREE.Color(color))
   const uniforms = {
     uBase: { value: baseline }, uTime: { value: 0 }, uMix: { value: 0 }, uEnergy: { value: 0 },
     uDeep: { value: targets[0].clone() }, uMid: { value: targets[1].clone() },
@@ -27,11 +27,12 @@ export function createMusicVisuals(scene: THREE.Scene, baseline: THREE.Texture) 
         vec2 center = vec2(.49 + sin(t * .7) * .12, .48 + cos(t) * .1);
         vec2 d = (p - center) * vec2(min(uAspect, 1.8), 1.0);
         float haze = exp(-dot(d, d) * 3.3);
-        vec3 color = mix(uDeep, uMid, haze * .8);
-        color = mix(color, uLight, ribbon * (.28 + uEnergy * .13));
-        color = mix(color, uOther, echo * .24);
-        color += uLight * exp(-dot(d, d) * 6.0) * uEnergy * .035;
-        gl_FragColor = vec4(mix(texture2D(uBase, vUv).rgb, color, uMix), 1.0);
+        vec3 base = texture2D(uBase, vUv).rgb;
+        // Illuminate the venue instead of replacing the photograph with a gradient.
+        vec3 glow = uLight * ribbon * (.035 + uEnergy * .05)
+                  + uOther * echo * .035 + uMid * haze * .025;
+        vec3 color = base * (vec3(1.0) + uLight * haze * .22) + glow;
+        gl_FragColor = vec4(mix(base, color, uMix), 1.0);
         #include <colorspace_fragment>
       }`,
   })
@@ -41,7 +42,7 @@ export function createMusicVisuals(scene: THREE.Scene, baseline: THREE.Texture) 
   atmosphere.add(background)
   const target = new THREE.WebGLRenderTarget(768, 432, { depthBuffer: false, stencilBuffer: false, type: THREE.HalfFloatType })
   target.texture.colorSpace = THREE.LinearSRGBColorSpace
-  let enabled = false, paintElapsed = 1, dirty = false
+  let enabled = false, paintElapsed = 1, dirty = false, baselineVersion = baseline.version
   const palette = [uniforms.uDeep, uniforms.uMid, uniforms.uLight, uniforms.uOther]
   return {
     select(mood: MoodId) {
@@ -51,6 +52,9 @@ export function createMusicVisuals(scene: THREE.Scene, baseline: THREE.Texture) 
     },
     reset() { enabled = false },
     update(dt: number, energy: number, paused: boolean) {
+      const baseChanged = baselineVersion !== baseline.version
+      baselineVersion = baseline.version
+      dirty ||= baseChanged
       const ease = 1 - Math.exp(-dt * 2.3)
       paintElapsed += dt
       uniforms.uMix.value = THREE.MathUtils.lerp(uniforms.uMix.value, enabled ? 1 : 0, ease)
@@ -60,7 +64,7 @@ export function createMusicVisuals(scene: THREE.Scene, baseline: THREE.Texture) 
       const changing = Math.abs(uniforms.uMix.value - (enabled ? 1 : 0)) > .001 || palette.some((uniform, i) => Math.abs(uniform.value.r - targets[i].r) + Math.abs(uniform.value.g - targets[i].g) + Math.abs(uniform.value.b - targets[i].b) > .001)
       dirty ||= changing || enabled && !paused
       if (!enabled && uniforms.uMix.value < .001) { scene.background = baseline; dirty = false }
-      return enabled && !paused || changing
+      return enabled && !paused || changing || baseChanged
     },
     paint(renderer: THREE.WebGLRenderer) {
       if (!dirty || paintElapsed < 1 / 30) return
@@ -71,8 +75,8 @@ export function createMusicVisuals(scene: THREE.Scene, baseline: THREE.Texture) 
     },
     resize(aspect: number) {
       uniforms.uAspect.value = aspect
-      // Broad gradients need very few pixels, even on Retina displays.
-      target.setSize(aspect >= 1 ? 768 : Math.round(512 * aspect), aspect >= 1 ? Math.round(768 / aspect) : 512)
+      // Keep the venue photo legible while capping the atmosphere pass to ~1 MP.
+      target.setSize(aspect >= 1 ? 1440 : Math.round(1000 * aspect), aspect >= 1 ? Math.round(1440 / aspect) : 1000)
       dirty = true; paintElapsed = 1
     },
     dispose() { target.dispose(); background.geometry.dispose(); material.dispose() },
