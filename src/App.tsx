@@ -188,7 +188,6 @@ export default function App() {
       </JellyCard>
 
       <button className="large-x brand-symbol absolute z-10" onClick={scatter} aria-label="Scatter the shapes" title="Scatter the shapes"><img src="/brand/musync-symbol-white.svg" alt="" width="96" height="109" /></button>
-      <div className="edition absolute z-10 flex items-center pointer-events-none" aria-label="Experiment 01"><span className="display-font">01</span><span className="edition-dash" /></div>
 
       <footer className="hero-footer absolute inset-x-0 bottom-0 z-20 flex items-end justify-between">
         <div className="material-caption"><p className="font-semibold">No middlemen.</p><p>Closer to your fans.</p></div>
