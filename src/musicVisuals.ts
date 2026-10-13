@@ -3,7 +3,7 @@ import { MUSIC_MOODS, type MoodId } from './musicMoods'
 
 /** Small cached atmosphere texture; no bloom or environment rebakes. */
 export function createMusicVisuals(scene: THREE.Scene, baseline: THREE.Texture) {
-  const targets = ['#0b0e11', '#39251f', '#ff602c', '#7199b6'].map(color => new THREE.Color(color))
+  const targets = ['#4d3f69', '#a678a3', '#ffc08a', '#d28fe7'].map(color => new THREE.Color(color))
   const uniforms = {
     uBase: { value: baseline }, uTime: { value: 0 }, uMix: { value: 0 }, uEnergy: { value: 0 },
     uDeep: { value: targets[0].clone() }, uMid: { value: targets[1].clone() },
@@ -28,10 +28,10 @@ export function createMusicVisuals(scene: THREE.Scene, baseline: THREE.Texture) 
         vec2 d = (p - center) * vec2(min(uAspect, 1.8), 1.0);
         float haze = exp(-dot(d, d) * 3.3);
         vec3 base = texture2D(uBase, vUv).rgb;
-        // Illuminate the venue instead of replacing the photograph with a gradient.
-        vec3 glow = uLight * ribbon * (.035 + uEnergy * .05)
-                  + uOther * echo * .035 + uMid * haze * .025;
-        vec3 color = base * (vec3(1.0) + uLight * haze * .22) + glow;
+        // Colored stage light drifts over the bright haze without dimming the backdrop.
+        vec3 glow = uLight * ribbon * (.025 + uEnergy * .035)
+                  + uOther * echo * .045 + uMid * haze * .02;
+        vec3 color = base * (vec3(1.0) + uLight * haze * .1) + glow;
         gl_FragColor = vec4(mix(base, color, uMix), 1.0);
         #include <colorspace_fragment>
       }`,
@@ -75,8 +75,8 @@ export function createMusicVisuals(scene: THREE.Scene, baseline: THREE.Texture) 
     },
     resize(aspect: number) {
       uniforms.uAspect.value = aspect
-      // Keep the venue photo legible while capping the atmosphere pass to ~1 MP.
-      target.setSize(aspect >= 1 ? 1440 : Math.round(1000 * aspect), aspect >= 1 ? Math.round(1440 / aspect) : 1000)
+      // Soft haze needs only a small cached texture; the sculpture stays full resolution.
+      target.setSize(aspect >= 1 ? 960 : Math.round(768 * aspect), aspect >= 1 ? Math.round(960 / aspect) : 768)
       dirty = true; paintElapsed = 1
     },
     dispose() { target.dispose(); background.geometry.dispose(); material.dispose() },

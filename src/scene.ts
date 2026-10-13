@@ -91,7 +91,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   renderer.setClearColor(0x000000, 0)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = .95
+  renderer.toneMappingExposure = 1.05
   renderer.transmissionResolutionScale = .35
   renderer.outputColorSpace = THREE.SRGBColorSpace
   host.appendChild(renderer.domElement)
@@ -124,14 +124,14 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     }
   })
   const surfaces = createUndergroundSurfaces(renderer.capabilities.getMaxAnisotropy())
-  const patina = { roughnessMap: surfaces.roughness, clearcoatRoughnessMap: surfaces.roughness, bumpMap: surfaces.roughness, bumpScale: .007 }
+  const patina = { roughnessMap: surfaces.roughness, clearcoatRoughnessMap: surfaces.roughness, bumpMap: surfaces.roughness, bumpScale: .0045 }
   const finishes: Record<Finish, THREE.MeshPhysicalMaterial> = {
-    ink: new THREE.MeshPhysicalMaterial({ color: '#888580', map: surfaces.ink, ...patina, roughness: .36, metalness: .28, clearcoat: .6, clearcoatRoughness: .22, envMapIntensity: 1.1 }),
-    coral: new THREE.MeshPhysicalMaterial({ color: '#ed461c', map: surfaces.paint, ...patina, roughness: .38, metalness: .08, clearcoat: .48, clearcoatRoughness: .25, envMapIntensity: .9 }),
-    lilac: new THREE.MeshPhysicalMaterial({ color: '#d5379b', map: surfaces.paint, ...patina, roughness: .36, metalness: .1, clearcoat: .62, clearcoatRoughness: .22, envMapIntensity: 1 }),
-    blue: new THREE.MeshPhysicalMaterial({ color: '#394854', map: surfaces.paint, ...patina, roughness: .4, metalness: .4, clearcoat: .5, clearcoatRoughness: .24, envMapIntensity: 1.05 }),
-    pearl: new THREE.MeshPhysicalMaterial({ color: '#d8cbb8', map: surfaces.paper, ...patina, roughness: .49, metalness: .02, clearcoat: .35, clearcoatRoughness: .32, envMapIntensity: .85 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: '#e9d3bf', roughness: .14, metalness: .05, transmission: .9, thickness: .65, ior: 1.46, clearcoat: .8, clearcoatRoughness: .2, attenuationColor: '#ad7463', attenuationDistance: 7, envMapIntensity: 1.25 }),
+    ink: new THREE.MeshPhysicalMaterial({ color: '#b1a6aa', map: surfaces.ink, ...patina, roughness: .36, metalness: .28, clearcoat: .6, clearcoatRoughness: .22, envMapIntensity: 1.1 }),
+    coral: new THREE.MeshPhysicalMaterial({ color: '#f46c51', map: surfaces.paint, ...patina, roughness: .38, metalness: .08, clearcoat: .48, clearcoatRoughness: .25, envMapIntensity: .9 }),
+    lilac: new THREE.MeshPhysicalMaterial({ color: '#f53bb0', map: surfaces.paint, ...patina, roughness: .36, metalness: .1, clearcoat: .62, clearcoatRoughness: .22, envMapIntensity: 1 }),
+    blue: new THREE.MeshPhysicalMaterial({ color: '#9678bd', map: surfaces.paint, ...patina, roughness: .4, metalness: .4, clearcoat: .5, clearcoatRoughness: .24, envMapIntensity: 1.05 }),
+    pearl: new THREE.MeshPhysicalMaterial({ color: '#f4e4d8', map: surfaces.paper, ...patina, roughness: .49, metalness: .02, clearcoat: .35, clearcoatRoughness: .32, envMapIntensity: .85 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: '#fff4f8', roughness: .115, metalness: 0, transmission: .96, thickness: .42, ior: 1.46, clearcoat: .8, clearcoatRoughness: .2, attenuationColor: '#e7b4d9', attenuationDistance: 10, envMapIntensity: 1.4 }),
   }
   finishes.ink.userData.liquidColor = '#17191b'
   const burstEffects = createBurstEffects(cluster, { ...finishes, bubble: orbits.bubbleMesh.material })
@@ -151,7 +151,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const glyphDark = new THREE.MeshPhysicalMaterial({ color: '#121416', metalness: .2, roughness: .33, clearcoat: .22, dithering: true, transparent: true })
   const glyphLight = new THREE.MeshPhysicalMaterial({ color: '#f0dfc9', metalness: .08, roughness: .25, clearcoat: .45, dithering: true, transparent: true })
   const glyphLilac = new THREE.MeshPhysicalMaterial({ color: '#d9c8b5', metalness: .25, roughness: .3, clearcoat: .3, dithering: true, transparent: true })
-  const glyphPrism = new THREE.MeshPhysicalMaterial({ color: '#f0d5b8', metalness: .2, roughness: .2, clearcoat: .7, emissive: '#cb6130', emissiveIntensity: .12, dithering: true, transparent: true })
+  const glyphPrism = new THREE.MeshPhysicalMaterial({ color: '#f7dce9', metalness: .2, roughness: .2, clearcoat: .7, emissive: '#e794b8', emissiveIntensity: .12, dithering: true, transparent: true })
   const artworkMaterials: THREE.MeshPhysicalMaterial[] = []
   const letterTextures: THREE.CanvasTexture[] = []
   const letterMaterials: THREE.MeshBasicMaterial[] = []
@@ -161,8 +161,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     const context = canvas.getContext('2d')!
     context.fillStyle = '#ffffff'
     context.textAlign = 'center'
-    context.font = '900 89px Arial, sans-serif'
-    context.letterSpacing = '-4px'
+    context.font = '400 92px "Permanent Marker", Arial, sans-serif'
+    context.letterSpacing = '-2px'
     context.textBaseline = 'middle'
     lines.forEach((line, i) => context.fillText(line, 256, 256 + (i - (lines.length - 1) / 2) * 95))
     context.globalCompositeOperation = 'destination-out'
@@ -521,7 +521,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     camera.top = viewHeight / 2
     camera.bottom = -viewHeight / 2
     camera.updateProjectionMatrix()
-    cluster.scale.setScalar(mobile ? .82 : 1)
+    cluster.scale.setScalar(mobile ? .82 : .9)
+    cluster.position.x = mobile ? 0 : camera.right * .13
     updateInstances()
     // Sharper Retina silhouettes, with a pixel budget for large desktop displays.
     renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio, 1.5), 2, Math.sqrt(5_000_000 / (width * height))))

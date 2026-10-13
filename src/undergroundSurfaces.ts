@@ -75,7 +75,7 @@ export function createUndergroundSurfaces(anisotropy: number) {
       }
     } else if (kind === 'poster') {
       ctx.save(); clip(); ctx.drawImage(paperCanvas, 0, 0)
-      ctx.fillStyle = '#1a1918'; ctx.font = '900 85px Arial, sans-serif'; ctx.textAlign = 'left'; ctx.letterSpacing = '-5px'
+      ctx.fillStyle = '#1a1918'; ctx.font = '400 88px "Permanent Marker", Arial, sans-serif'; ctx.textAlign = 'left'; ctx.letterSpacing = '-3px'
       ;['REAL', 'ARTISTS.', 'REAL', 'CHANGE.'].forEach((word, i) => { ctx.save(); ctx.translate(39, 115 + i * 91); ctx.rotate(-.035); ctx.fillText(word, 0, 0); ctx.restore() })
       ctx.globalCompositeOperation = 'destination-out'
       for (let i = 0; i < 700; i++) { ctx.fillStyle = `rgba(0,0,0,${random() * .65})`; ctx.fillRect(random() * 512, random() * 512, 1 + random() * 3, random() * 2) }

@@ -1,14 +1,14 @@
 const song = (artist: string, name: string) => ({ artist, name, src: `/songs/${encodeURIComponent(`${artist} - ${name}.mp3`)}` })
 
-/** One local recording per material; colored light is restrained against the underground venue. */
+/** One local recording per material; colored stage lights complement the luminous peach/violet haze. */
 export const MUSIC_MOODS = {
-  coral: { ...song('Moavii', 'Sunshine'), accent: '#ff784b', deep: '#170f0c', mid: '#79311e', light: '#f35222', secondary: '#a8475f' },
-  ink: { ...song('Tetuano', 'Wavy Strut'), accent: '#bca48d', deep: '#080d11', mid: '#26333d', light: '#a2bed2', secondary: '#d06435' },
-  lilac: { ...song('NVL8', 'Pink Clouds'), accent: '#eb60b4', deep: '#120d17', mid: '#642049', light: '#d73495', secondary: '#7e70af' },
-  pearl: { ...song('Pufino', 'Enjoy'), accent: '#e6ccaa', deep: '#14110c', mid: '#67513d', light: '#d3ae78', secondary: '#b75531' },
-  glass: { ...song('Johny Grimes', "That's Life"), accent: '#f1996a', deep: '#100e0b', mid: '#573026', light: '#f26c36', secondary: '#6787a6' },
-  blue: { ...song('Unheard', 'Back To Promise'), accent: '#8fb8d5', deep: '#0b1117', mid: '#243e50', light: '#568caf', secondary: '#9e5539' },
-  bubble: { ...song('Pufino', 'Tariro'), accent: '#e1bf9b', deep: '#13100e', mid: '#614734', light: '#b99166', secondary: '#6e98b5' },
+  coral: { ...song('Moavii', 'Sunshine'), accent: '#ffb395', deep: '#65354c', mid: '#a7697e', light: '#ffc08c', secondary: '#e996c2' },
+  ink: { ...song('Tetuano', 'Wavy Strut'), accent: '#c3b7ef', deep: '#383853', mid: '#79698f', light: '#a3b5ef', secondary: '#edafae' },
+  lilac: { ...song('NVL8', 'Pink Clouds'), accent: '#ff9cdb', deep: '#643a6e', mid: '#af70ab', light: '#f3a0db', secondary: '#a9a1e8' },
+  pearl: { ...song('Pufino', 'Enjoy'), accent: '#ffe2bc', deep: '#715261', mid: '#bb959d', light: '#ffe0ad', secondary: '#dba8d8' },
+  glass: { ...song('Johny Grimes', "That's Life"), accent: '#ffc0b3', deep: '#665175', mid: '#af81a1', light: '#ffc596', secondary: '#cbb0ef' },
+  blue: { ...song('Unheard', 'Back To Promise'), accent: '#ccb3ff', deep: '#484971', mid: '#897fb1', light: '#c7b3f2', secondary: '#e5a7c9' },
+  bubble: { ...song('Pufino', 'Tariro'), accent: '#f3d9ff', deep: '#615273', mid: '#a593b9', light: '#ead0e9', secondary: '#b5c7ed' },
 } as const
 
 export type MoodId = keyof typeof MUSIC_MOODS

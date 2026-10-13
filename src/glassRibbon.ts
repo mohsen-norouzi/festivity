@@ -65,7 +65,7 @@ export function createRibbonGeometry(nodes: THREE.Vector3[]) {
     }
   }
   glass.setIndex(indices); lettering.setIndex(textIndices); edges.setIndex(edgeIndices)
-  const warm = new THREE.Color('#b68164'), cool = new THREE.Color('#96aabb'), color = new THREE.Color()
+  const warm = new THREE.Color('#e2ac9b'), cool = new THREE.Color('#cbafe4'), color = new THREE.Color()
   let uvReady = false
   const update = (reveal = 1) => {
     for (let i = 0; i < SEGMENTS; i++) curve.getPoint(i / SEGMENTS, centers[i])
@@ -145,7 +145,7 @@ export function createGlassRibbon(parent: THREE.Group, anisotropy: number) {
   group.name = 'Smoked inscription ribbon'
   parent.add(group)
   const glassMaterial = new THREE.MeshPhysicalMaterial({
-    color: '#252628', vertexColors: true, roughness: .28, metalness: .35,
+    color: '#352732', vertexColors: true, roughness: .28, metalness: .35,
     ior: 1.46, transparent: true, opacity: .3, depthWrite: false,
     clearcoat: .75, clearcoatRoughness: .2, envMapIntensity: 1.35,
     iridescence: .05, iridescenceIOR: 1.3, iridescenceThicknessRange: [160, 320],
@@ -165,7 +165,7 @@ export function createGlassRibbon(parent: THREE.Group, anisotropy: number) {
   glassMaterial.customProgramCacheKey = () => 'smoked-ribbon-v2'
   const textMaterial = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, opacity: .88 })
   textMaterial.forceSinglePass = true
-  const edgeMaterial = new THREE.MeshPhysicalMaterial({ color: '#d5b29b', metalness: .7, roughness: .24, clearcoat: .8, envMapIntensity: 1.6, transparent: true, opacity: .7, depthWrite: false, dithering: true })
+  const edgeMaterial = new THREE.MeshPhysicalMaterial({ color: '#f5c6d6', metalness: .7, roughness: .24, clearcoat: .8, envMapIntensity: 1.6, transparent: true, opacity: .7, depthWrite: false, dithering: true })
   const slices: THREE.BufferGeometry[] = []
   // Separate draw ranges give the near/far arcs correct depth ordering relative
   // to the existing glass cubes, while sharing all vertex buffers.
