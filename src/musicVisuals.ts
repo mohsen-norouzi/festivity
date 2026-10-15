@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { MoodId } from './musicMoods'
 
 // Deep, rose haze, warm glow, light, violet haze, and a secondary light.
-const HOME = ['#393453', '#a1658b', '#ffad88', '#ffe8b5', '#8066bb', '#ee8dc5'] as const
+const HOME = ['#302944', '#a05d85', '#ff9c72', '#ffebc2', '#634b9b', '#f476bb'] as const
 const PALETTES: Record<MoodId, readonly string[]> = {
   coral: ['#593448', '#b96c7f', '#ff9872', '#ffe0a5', '#9b698c', '#ffc0a4'],
   ink: ['#282c42', '#65657f', '#b69da9', '#e0d3e2', '#647da5', '#b6a0e0'],
@@ -53,50 +53,63 @@ export function createMusicVisuals(scene: THREE.Scene) {
         return exp(-dot(d, d));
       }
       void main() {
-        float t = uTime * .035;
+        float t = uTime * .16;
         vec2 p = vUv;
-        // A small continuous pan follows the ascent; no second sky or opacity layer.
         p.y += uTravel * .12;
-        vec2 metric = vec2(clamp(uAspect, .8, 1.9), 1.0);
-        vec2 field = p * metric;
-        float haze = fog(field * 2.5 + vec2(t * .28, -t * .22));
-        float silk = fog(field * 4.0 + vec2(-t * .13, t * .18) + 9.7);
-        vec2 q = p + vec2(sin(p.y * 3.1 + t), cos(p.x * 3.4 - t * .8)) * .035;
-        q += vec2(haze - .5, silk - .5) * .13;
+        vec2 metric = vec2(uAspect, 1.0);
+        vec2 field = p * vec2(clamp(uAspect, .8, 1.9), 1.0);
+        float haze = fog(field * 2.8 + vec2(t * .28, -t * .22));
+        float silk = fog(field * 5.2 + vec2(-t * .2, t * .24) + 9.7);
+        float wisps = fog(field * vec2(9.0, 3.5) + vec2(t * .2, -t * .3) + haze * 1.5);
+        vec2 q = p + vec2(sin(p.y * 3.1 + t), cos(p.x * 3.4 - t * .8)) * .045;
+        q += vec2(haze - .5, silk - .5) * .19;
 
-        vec3 color = mix(uDeep, uCool, .12 + haze * .2);
-        float rose = cloud(q, vec2(.28 + sin(t * .7) * .04, .57), vec2(2.5, 1.35));
-        color = mix(color, uHaze, rose * (.64 + silk * .24));
-        float violet = cloud(q, vec2(.92, .37 + sin(t * .5) * .05), vec2(3.5, 2.2));
-        color = mix(color, uCool, violet * .58);
+        // Violet depth with rose smoke: irregular translucent layers rather than flat blobs.
+        vec3 color = mix(uDeep * .74, uCool * .65, .18 + haze * .24);
+        float rose = cloud(q, vec2(.3 + sin(t * .9) * .065, .57), vec2(3.3, 1.55));
+        color = mix(color, uHaze, rose * (.24 + silk * .58));
+        float violet = cloud(q, vec2(.94, .34 + sin(t * .9) * .07), vec2(4.0, 2.2));
+        color = mix(color, uCool, violet * (.35 + wisps * .45));
+        float plume = cloud(q, vec2(.28 + sin(t * .8) * .06, .42), vec2(6.2, 1.65));
+        color = mix(color, uWarm, plume * smoothstep(.22, .85, wisps) * .72);
+        float silkLight = smoothstep(.33, .78, silk);
+        color *= .77 + silkLight * .42;
 
-        float leftGlow = cloud(q, vec2(-.055, .23 + sin(t * .8) * .04), vec2(2.7, 3.3));
-        color = mix(color, uWarm, leftGlow * .92);
-        float plume = cloud(q, vec2(.3, .36), vec2(5.5, 1.9));
-        color = mix(color, uWarm, plume * (.12 + haze * .25));
-        float shoulder = cloud(q, vec2(1.08, .78 + cos(t * .6) * .035), vec2(4.3, 3.2));
-        color = mix(color, uWarm, shoulder * .82);
+        // Broad amber light blooms into a feathered diagonal stage beam.
+        vec2 glowCenter = vec2(-.055 + sin(t * .7) * .035, .26 + sin(t) * .045);
+        float leftGlow = cloud(q, glowCenter, vec2(3.1, 4.5));
+        color = mix(color, uWarm, leftGlow * .87);
+        float slope = q.y - glowCenter.y + q.x * .4 + sin(q.x * 4.0 + t) * .025;
+        float halo = exp(-slope * slope * 65.0) * exp(-max(q.x, 0.0) * 4.0);
+        float beam = exp(-slope * slope * 850.0) * exp(-max(q.x, 0.0) * 4.3);
+        float core = cloud(q, glowCenter, vec2(6.5, 10.0));
+        color += uWarm * halo * .32;
+        color += uLight * (beam * .88 + core * .76) * (.8 + haze * .4);
 
-        // Feathered diagonal light: a broad halo and a soft, luminous center.
-        float slope = q.y - .22 + q.x * .37 + sin(q.x * 4.0 + t) * .018;
-        float beam = exp(-slope * slope * 190.0) * exp(-max(q.x, 0.0) * 4.0);
-        float core = cloud(q, vec2(-.055, .22), vec2(5.5, 7.5));
-        color = mix(color, uLight, clamp(beam * .55 + core * .66, 0.0, .9));
-        color = mix(color, uLight, shoulder * shoulder * .27);
-        float veil = cloud(q, vec2(.55, .18), vec2(1.8, 4.0));
-        color = mix(color, uAccent, veil * (.06 + silk * .13));
-        color += uAccent * violet * (.015 + uEnergy * .025);
+        // A distant light on the right, with magenta haze drifting beneath it.
+        float shoulder = cloud(q, vec2(1.055, .82 + cos(t * .85) * .035), vec2(6.0, 6.8));
+        color = mix(color, uWarm, shoulder * .7);
+        color += uLight * shoulder * shoulder * .92;
+        float glimmer = smoothstep(.46, .8, wisps) * violet;
+        color += uAccent * glimmer * (.34 + uEnergy * .05);
 
-        // A few defocused lights, softly drifting within the haze.
-        for (int i = 0; i < 8; i++) {
-          float seed = float(i);
+        // Defocused, softly edged light circles at different depths. No sprite downloads.
+        for (int i = 0; i < 18; i++) {
+          float seed = float(i) + 2.0;
           vec2 point = vec2(hash(vec2(seed, 2.0)), hash(vec2(seed, 8.0)));
-          point += vec2(sin(t * .8 + seed), cos(t * .6 + seed * 1.7)) * .025;
-          vec2 d = (p - point) * metric;
-          float radius = mix(.012, .025, hash(vec2(seed, 4.0)));
-          float bokeh = exp(-dot(d, d) / (radius * radius));
-          color += mix(uWarm, uAccent, point.x) * bokeh * .065;
+          point += vec2(sin(t * .8 + seed), cos(t * .65 + seed * 1.7)) * vec2(.024, .045);
+          float radius = mix(.009, .027, hash(vec2(seed, 4.0)));
+          float distance = length((p - point) * metric) / radius;
+          float disc = 1.0 - smoothstep(.32, 1.3, distance);
+          float glow = exp(-distance * distance * .65);
+          float strength = mix(.1, .27, hash(vec2(seed, 6.0))) * (.75 + .25 * sin(t + seed * 2.1));
+          vec3 tint = mix(uWarm, uAccent, smoothstep(.35, .9, point.x));
+          color += tint * (disc + glow * .4) * strength;
         }
+
+        // Grade the entire left side in the background itself; no text-shaped overlay.
+        float left = 1.0 - smoothstep(.0, .48, p.x);
+        color *= 1.0 - left * .27;
         // Fixed fine grain prevents banding without flicker or a texture download.
         color += (hash(gl_FragCoord.xy) - .5) * .003;
         gl_FragColor = vec4(max(color, vec3(0.0)), 1.0);
