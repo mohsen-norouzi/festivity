@@ -84,6 +84,22 @@ describe('live balloon ascent', () => {
     orbits.dispose()
   })
 
+
+  test('a contact displacement settles without oscillation', () => {
+    const body = cubeAt(0, 0), flight = createBalloonFlight(), target = new THREE.Vector3()
+    flight.start(body)
+    // A neighboring surface pushes the balloon sideways; lift must settle without ringing.
+    body.position.x = .4
+    let previousError = .4
+    for (let i = 0; i < 270; i++) {
+      flight.aim(target, dt); flight.integrate(body, dt)
+      expect(body.position.x).toBeGreaterThanOrEqual(0)
+      expect(body.position.x).toBeLessThanOrEqual(previousError)
+      previousError = body.position.x
+    }
+    expect(body.position.x).toBeLessThan(.0001)
+  })
+
   test('cancelling a flight immediately releases its force without teleporting the body', () => {
     const body = cubeAt(0, 0), flight = createBalloonFlight()
     flight.start(body); flight.aim(new THREE.Vector3(0, 2, 0), dt); flight.integrate(body, dt)

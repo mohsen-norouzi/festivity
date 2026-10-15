@@ -19,7 +19,8 @@ export function createBalloonFlight() {
       body.mass = Math.max(body.mass, body.radius ** 3 * .45)
       body.previous.copy(body.position)
       force.subVectors(target, body.position).multiplyScalar(36)
-        .addScaledVector(targetVelocity, 10).addScaledVector(body.velocity, -10).clampLength(0, 48)
+        // Critical damping absorbs contact impulses without spring ringing.
+        .addScaledVector(targetVelocity, 12).addScaledVector(body.velocity, -12).clampLength(0, 48)
       body.velocity.addScaledVector(force, dt).clampLength(0, 16)
       body.position.addScaledVector(body.velocity, dt)
       return true

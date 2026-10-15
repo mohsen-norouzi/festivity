@@ -28,7 +28,8 @@ export function createBodyContacts() {
           b.position.addScaledVector(normal, correction * (1 - share))
           const closing = (b.velocity.x - a.velocity.x) * normal.x + (b.velocity.y - a.velocity.y) * normal.y + (b.velocity.z - a.velocity.z) * normal.z
           if (closing < 0) {
-            const impulse = -closing * 1.28
+            // A rising balloon yields without rebounding against its lift spring.
+            const impulse = -closing * (ascending ? 1 : 1.28)
             a.velocity.addScaledVector(normal, -impulse * share)
             b.velocity.addScaledVector(normal, impulse * (1 - share))
           }

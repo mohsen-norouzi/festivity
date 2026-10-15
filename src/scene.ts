@@ -37,6 +37,7 @@ interface Body {
   previous: THREE.Vector3
   velocity: THREE.Vector3
   rotation: THREE.Quaternion
+  previousRotation: THREE.Quaternion
   spin: THREE.Vector3
   radius: number
   mass: number
@@ -259,7 +260,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     const home = new THREE.Vector3(...piece.p)
     if (index < 22) { home.x *= .94; home.y *= .9; home.z *= 1.1 }
     const rest = new THREE.Quaternion().setFromEuler(new THREE.Euler(...(piece.tilt ?? [.2, .2, .2])))
-    bodies.push({ enabled: false, halfSize: geometry.boundingBox!.max.clone().multiplyScalar(piece.r), shapePower: piece.form === 'capsule' ? 2.8 : 3.8, home, rest, object, position: home.clone(), previous: home.clone(), velocity: new THREE.Vector3(), rotation: rest.clone(), spin: new THREE.Vector3(), radius: piece.r, mass: piece.r ** 3, phase: random() * Math.PI * 2 })
+    bodies.push({ enabled: false, halfSize: geometry.boundingBox!.max.clone().multiplyScalar(piece.r), shapePower: piece.form === 'capsule' ? 2.8 : 3.8, home, rest, object, position: home.clone(), previous: home.clone(), velocity: new THREE.Vector3(), rotation: rest.clone(), previousRotation: rest.clone(), spin: new THREE.Vector3(), radius: piece.r, mass: piece.r ** 3, phase: random() * Math.PI * 2 })
   })
 
   const preparePiece = (index: number) => {
@@ -312,7 +313,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     bodies.forEach(body => {
       body.position.copy(body.home); body.previous.copy(body.home)
       body.velocity.set(0, 0, 0); body.spin.set(0, 0, 0)
-      body.rotation.copy(body.rest)
+      body.rotation.copy(body.rest); body.previousRotation.copy(body.rest)
     })
   }
 
@@ -370,7 +371,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     offset.set(x * distance, y * distance, body.home.z * cluster.scale.x)
     cluster.worldToLocal(offset)
     body.position.copy(offset)
-    if (index < COUNT) body.rotation.copy(bodies[index].rest)
+    if (index < COUNT) { body.rotation.copy(bodies[index].rest); bodies[index].previousRotation.copy(body.rotation) }
   }, index => reactions.scale(index), index => journey.state.phase !== 'idle' && index === journey.state.index ? flightScale : null)
   const flightStart = new THREE.Vector3(), flightTarget = new THREE.Vector3()
   let flightRadius = 1
@@ -421,7 +422,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     flight.reset()
   }
   const updateJourney = () => {
-    const { phase, index, travel, growth } = journey.state
+    const { phase, index, growth } = journey.state
+    const travel = journey.renderTravel(paused ? 1 : renderAlpha)
     const viewHeight = camera.top - camera.bottom
     camera.position.y = travel * viewHeight
     camera.updateMatrixWorld()
@@ -454,8 +456,15 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const bubbleRadiusAt = (index: number) => lifecycle.scale(COUNT + index, renderAlpha)
   let renderAlpha = 1
 
+  const updateClusterTransform = (time: number) => {
+    cluster.rotation.y = Math.sin(time * .14) * .025
+    cluster.rotation.z = Math.sin(time * .2) * .014
+    cluster.updateMatrixWorld(true)
+  }
   const step = (dt: number, settling = false) => {
     elapsed += settling ? 0 : dt
+    // Convert the flight target using the physics pose, never a stale render pose.
+    updateClusterTransform(elapsed)
     if (!settling) {
       advanceJourney(dt)
       lifecycle.step(dt)
@@ -463,6 +472,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     for (let i = 0; i < COUNT; i++) {
       const body = bodies[i]
       if (body.enabled === false) continue
+      body.previousRotation.copy(body.rotation)
       if (!settling && flight.integrate(body, dt)) continue
       const { position: p, velocity: v, radius: r } = body
       body.previous.copy(p)
@@ -534,14 +544,12 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const updateInstances = (alpha = 1) => {
     renderAlpha = alpha
     orbits.update(alpha, bubbleRadiusAt)
-    cluster.rotation.y = Math.sin(elapsed * .14) * .025
-    cluster.rotation.z = Math.sin(elapsed * .2) * .014
-    cluster.updateMatrixWorld(true)
+    updateClusterTransform(paused ? elapsed : Math.max(0, elapsed - STEP + alpha * STEP))
     bodies.forEach((body, i) => {
       body.object.visible = body.enabled !== false
       body.object.scale.setScalar(lifecycle.scale(i, alpha))
       body.object.position.lerpVectors(body.previous, body.position, alpha)
-      body.object.quaternion.copy(body.rotation)
+      body.object.quaternion.slerpQuaternions(body.previousRotation, body.rotation, alpha)
       offset.copy(body.object.position).applyMatrix4(cluster.matrixWorld)
       contactLighting.setSphere(i, offset, body.enabled === false ? 0 : body.radius * cluster.scale.x * .79)
     })
@@ -769,6 +777,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       }
     }
     body.previous.copy(body.position)
+    if (index < COUNT) bodies[index].previousRotation.copy(body.rotation)
     if (index >= COUNT) orbits.bubbleMesh.visible = true
     needsRender = true
     if (!hasArrived) {
@@ -814,7 +823,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     if (!travelling && paused && (needsRender || settleFrames > 0)) {
       if (settleFrames > 0) { for (let i = 0; i < 4; i++) step(STEP, true); settleFrames-- }
       orbits.rest()
-      bodies.forEach(body => body.previous.copy(body.position))
+      bodies.forEach(body => { body.previous.copy(body.position); body.previousRotation.copy(body.rotation) })
       updateInstances()
       needsRender = true
     }
@@ -924,7 +933,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         interactiveBodies.forEach((body, index) => {
           if (journey.state.phase === 'idle' && entrance.hasEntered(index) && elapsed - arrivedAt[index] < 5) {
             body.position.copy(body.home); body.previous.copy(body.home); body.velocity.set(0, 0, 0)
-            if (index < COUNT) body.rotation.copy(bodies[index].rest)
+            if (index < COUNT) { body.rotation.copy(bodies[index].rest); bodies[index].previousRotation.copy(body.rotation) }
           }
         })
         settleFrames = 24

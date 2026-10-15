@@ -19,7 +19,6 @@ describe('balloon-led page ascent', () => {
     expect(journey.state.travel).toBe(1)
     expect(journey.state.rise).toBe(1)
     expect(journey.state.phase).toBe('popped')
-    advance(journey + .01)
     expect(journey.state.phase).toBe('popped')
     advance(journey, 20)
     expect(phases).toEqual(['ascending', 'popped'])
@@ -90,5 +89,39 @@ describe('balloon-led page ascent', () => {
     journey.skipTravel()
     expect(journey.state.phase).toBe('popped')
     expect(journey.state.travel).toBe(1)
+  })
+})
+
+
+describe('interpolated ascent camera', () => {
+  for (const fps of [30, 60, 75, 120, 144]) {
+    test(`no alternating camera jumps at ${fps} fps with 90 Hz physics`, () => {
+      const journey = createBalloonJourney(), step = 1 / 90, frame = 1 / fps
+      journey.start(0)
+      let accumulator = 0, previous = 0, previousSpeed = 0, maximumSpeedJump = 0
+      for (let time = 0; time < 3.5; time += frame) {
+        accumulator += frame
+        while (accumulator >= step) { journey.step(step); accumulator -= step }
+        const travel = journey.renderTravel(accumulator / step)
+        const speed = (travel - previous) / frame
+        if (time > 1 && time < 3.4) maximumSpeedJump = Math.max(maximumSpeedJump, Math.abs(speed - previousSpeed))
+        expect(travel).toBeGreaterThanOrEqual(previous)
+        expect(travel).toBeLessThanOrEqual(journey.state.travel + 1e-12)
+        previous = travel; previousSpeed = speed
+      }
+      // Without interpolation, 60 Hz alternates one/two physics ticks and 144 Hz
+      // repeats entire camera poses. Both produce speed jumps above .3 per second.
+      expect(maximumSpeedJump).toBeLessThan(.025)
+    })
+  }
+
+  test('arrival and reset leave no delayed camera catch-up', () => {
+    const journey = createBalloonJourney()
+    journey.start(0); advance(journey, 4)
+    expect(journey.renderTravel(0)).toBe(1)
+    journey.reset()
+    expect(journey.renderTravel(.7)).toBe(0)
+    journey.start(1, true)
+    expect(journey.renderTravel(0)).toBe(1)
   })
 })
