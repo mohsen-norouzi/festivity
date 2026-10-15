@@ -144,7 +144,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     material.dithering = true
     if (name !== 'glass') contactLighting.apply(material)
   })
-  const musicVisuals = createMusicVisuals(scene, studio.background)
+  const musicVisuals = createMusicVisuals(scene)
   const selectMusic = (index: number) => {
     selectedMusic = index
     const mood = index < COUNT ? pieces[index].finish : 'bubble'
@@ -383,7 +383,6 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     flightScale = 1; flightPopped = false; flightContacts = 0; neighborMotion = 0
     flight.start(body)
     journey.start(index, paused)
-    musicVisuals.setDestination(index < COUNT ? pieces[index].finish : 'bubble')
     active = false
     cursor.classList.remove('visible', 'is-dragging', 'is-charging')
     // Reduced motion skips the climb and bursts immediately at the destination.
@@ -593,7 +592,6 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     const { width, height } = host.getBoundingClientRect()
     if (!width || !height) return
     const aspect = width / height
-    studio.resize(aspect)
     musicVisuals.resize(aspect)
     mobile = width < 768
     const viewHeight = mobile ? Math.max(8.2, 8.8 / aspect) : Math.max(8.2, 13.8 / aspect)
@@ -870,7 +868,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       }
       updateJourney()
     }
-    if (musicVisuals.update(dt, sound.energy, paused || !musicState.audible)) needsRender = true
+    if (musicVisuals.update(dt, musicState.audible ? sound.energy : 0, paused)) needsRender = true
     host.parentElement?.style.setProperty('--music-energy', sound.energy.toFixed(3))
     if (import.meta.env.DEV) {
       host.dataset.musicEnergy = sound.energy.toFixed(4)

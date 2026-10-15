@@ -40,37 +40,6 @@ export function createStudio(renderer: THREE.WebGLRenderer, scene: THREE.Scene) 
   softbox.dispose()
   panels.forEach(material => material.dispose())
 
-  const canvas = document.createElement('canvas')
-  const context = canvas.getContext('2d')!
-  const background = new THREE.CanvasTexture(canvas)
-  background.colorSpace = THREE.SRGBColorSpace
-  scene.background = background
-  let aspect = 16 / 9, disposed = false, loaded = false
-  const photo = new Image()
-  const paint = () => {
-    // Canvas dimensions may change at a breakpoint; release the old GPU storage.
-    background.dispose()
-    canvas.width = aspect >= 1 ? 1920 : Math.round(1200 * aspect)
-    canvas.height = aspect >= 1 ? Math.round(1920 / aspect) : 1200
-    context.fillStyle = '#796980'; context.fillRect(0, 0, canvas.width, canvas.height)
-    if (loaded) {
-      const scale = Math.max(canvas.width / photo.width, canvas.height / photo.height)
-      context.filter = 'none'
-      context.drawImage(photo, (canvas.width - photo.width * scale) * (aspect < 1 ? .38 : .5), (canvas.height - photo.height * scale) / 2, photo.width * scale, photo.height * scale)
-      context.filter = 'none'
-
-    }
-    // Keep the luminous photograph intact; only a light edge fade supports UI.
-    const shade = context.createLinearGradient(0, 0, 0, canvas.height)
-    shade.addColorStop(0, 'rgba(48,34,68,.08)'); shade.addColorStop(.18, 'rgba(48,34,68,0)')
-    shade.addColorStop(.8, 'rgba(48,34,68,0)'); shade.addColorStop(1, 'rgba(48,34,68,.14)')
-    context.fillStyle = shade; context.fillRect(0, 0, canvas.width, canvas.height)
-    background.needsUpdate = true
-  }
-  photo.onload = () => { if (!disposed) { loaded = true; paint() } }
-  photo.src = '/textures/stage-haze.webp'
-  paint()
-
   scene.add(new THREE.HemisphereLight('#efdef2', '#d79a89', .65))
   const key = new THREE.DirectionalLight('#ffe6d7', 2.7)
   key.position.set(-3, 5, 4); scene.add(key)
@@ -78,5 +47,5 @@ export function createStudio(renderer: THREE.WebGLRenderer, scene: THREE.Scene) 
   cool.position.set(4, 2, 2); scene.add(cool)
   const bounce = new THREE.DirectionalLight('#ffae68', 2.5)
   bounce.position.set(-4, -3, 1); scene.add(bounce)
-  return { background, resize(nextAspect: number) { if (Math.abs(aspect - nextAspect) > .001) { aspect = nextAspect; paint() } }, dispose() { disposed = true; photo.onload = null; environment.dispose(); background.dispose() } }
+  return { dispose() { environment.dispose() } }
 }

@@ -95,7 +95,7 @@ svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width:
 .interaction-label .status-dot { background: currentColor; }
 
 /* The lightweight shell arrives before the WebGL module has finished loading. */
-.hero { background: url('/textures/stage-haze.webp') center / cover, #7c6886; }
+.hero { background: radial-gradient(ellipse at -5% 77%, #ffe3ac 0%, #edaa8e 15%, transparent 47%), radial-gradient(ellipse at 108% 22%, #e9ab96, transparent 38%), radial-gradient(ellipse at 28% 44%, #a1658b, transparent 60%), #494064; }
 .scene { transition: opacity .45s ease; }
 .hero-header, .hero-footer { animation: shell-enter .85s cubic-bezier(.2,.7,.2,1) both; }
 .study-caption, .interaction-label { animation: shell-enter 1s .12s cubic-bezier(.2,.7,.2,1) both; }
