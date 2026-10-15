@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { createBalloonJourney, JOURNEY_ARRIVAL } from '../src/balloonJourney'
+import { createBalloonJourney, JOURNEY_ARRIVAL, JOURNEY_RETURN } from '../src/balloonJourney'
 
 const advance = (journey: ReturnType<typeof createBalloonJourney>, duration: number, fps = 90) => {
   const steps = Math.ceil(duration * fps)
@@ -123,5 +123,73 @@ describe('interpolated ascent camera', () => {
     expect(journey.renderTravel(.7)).toBe(0)
     journey.start(1, true)
     expect(journey.renderTravel(0)).toBe(1)
+  })
+})
+
+
+describe('return to the balloons', () => {
+  test('descends once, does not pop again, and allows another flight', () => {
+    const phases: string[] = []
+    const journey = createBalloonJourney(phase => phases.push(phase))
+    expect(journey.returnHome()).toBe(false)
+    journey.start(3)
+    expect(journey.returnHome()).toBe(false)
+    advance(journey, 4)
+    expect(journey.returnHome()).toBe(true)
+    expect(journey.renderTravel(0)).toBe(1)
+    expect(journey.returnHome()).toBe(false)
+    expect(journey.start(2)).toBe(false)
+    advance(journey, JOURNEY_RETURN / 2)
+    expect(journey.state.travel).toBeCloseTo(.5, 8)
+    advance(journey, JOURNEY_RETURN / 2 + .01)
+    expect(journey.state.phase).toBe('idle')
+    expect(journey.renderTravel(0)).toBe(0)
+    expect(phases).toEqual(['ascending', 'popped', 'returning', 'idle'])
+    expect(journey.start(2)).toBe(true)
+    advance(journey, 4)
+    expect(phases.filter(phase => phase === 'popped')).toHaveLength(2)
+  })
+
+  for (const fps of [30, 60, 75, 120, 144]) {
+    test(`descent stays smooth and monotonic at ${fps} fps`, () => {
+      const journey = createBalloonJourney(), step = 1 / 90, frame = 1 / fps
+      journey.start(0, true); journey.returnHome()
+      let accumulator = 0, previous = 1, previousSpeed = 0, maximumSpeedJump = 0
+      for (let time = 0; time < 2; time += frame) {
+        accumulator += frame
+        while (accumulator >= step) { journey.step(step); accumulator -= step }
+        const travel = journey.renderTravel(accumulator / step)
+        const speed = (travel - previous) / frame
+        maximumSpeedJump = Math.max(maximumSpeedJump, Math.abs(speed - previousSpeed))
+        expect(travel).toBeLessThanOrEqual(previous)
+        expect(travel).toBeGreaterThanOrEqual(0)
+        previous = travel; previousSpeed = speed
+      }
+      expect(maximumSpeedJump).toBeLessThan(.09)
+      expect(journey.state.phase).toBe('idle')
+    })
+  }
+
+  test('reduced motion returns immediately, including when enabled mid-descent', () => {
+    const journey = createBalloonJourney()
+    journey.start(0, true); journey.returnHome(true)
+    expect(journey.state.phase).toBe('idle')
+    expect(journey.renderTravel(.3)).toBe(0)
+    journey.start(1, true); journey.returnHome(); advance(journey, .4)
+    journey.skipTravel()
+    expect(journey.state.phase).toBe('idle')
+    expect(journey.renderTravel(.7)).toBe(0)
+  })
+
+  test('hidden-tab time and repeated requests cannot skip or restart the return', () => {
+    const journey = createBalloonJourney()
+    journey.start(0, true); journey.returnHome(); advance(journey, .5)
+    const travel = journey.renderTravel(.6)
+    journey.step(NaN); journey.step(-1); journey.step(0)
+    expect(journey.returnHome()).toBe(false)
+    expect(journey.renderTravel(.6)).toBe(travel)
+    journey.reset(); advance(journey, 5)
+    expect(journey.state.phase).toBe('idle')
+    expect(journey.renderTravel(0)).toBe(0)
   })
 })

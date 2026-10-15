@@ -19,6 +19,7 @@ import { createTileReactions, type ReactionKind } from './tileReactions'
 export interface OrnamentScene {
   dispose: () => void
   reset: () => void
+  returnHome: () => void
   scatter: () => void
   toggleMusic: () => void
   selectTrack: (mood: MoodId) => void
@@ -372,7 +373,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     cluster.worldToLocal(offset)
     body.position.copy(offset)
     if (index < COUNT) { body.rotation.copy(bodies[index].rest); bodies[index].previousRotation.copy(body.rotation) }
-  }, index => reactions.scale(index), index => journey.state.phase !== 'idle' && index === journey.state.index ? flightScale : null)
+  }, index => reactions.scale(index), index => (journey.state.phase === 'ascending' || journey.state.phase === 'popped') && index === journey.state.index ? flightScale : null)
   const flightStart = new THREE.Vector3(), flightTarget = new THREE.Vector3()
   let flightRadius = 1
   const beginJourney = (index: number) => {
@@ -395,7 +396,9 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     needsRender = true
   }
   const advanceJourney = (dt: number) => {
+    const wasReturning = journey.state.phase === 'returning'
     journey.step(dt)
+    if (wasReturning && journey.state.phase === 'idle') clearJourney()
     if (flightPopped || journey.state.phase === 'idle') return
     const { travel, rise, growth } = journey.state
     const viewHeight = camera.top - camera.bottom
@@ -438,7 +441,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       host.dataset.journeyScale = growth.toFixed(3)
       host.dataset.journeyContacts = String(flightContacts)
       host.dataset.journeyNeighborMotion = neighborMotion.toFixed(3)
-      host.dataset.journeyBalloonEnabled = String(interactiveBodies[index].enabled !== false)
+      host.dataset.journeyBalloonEnabled = String(index >= 0 && interactiveBodies[index].enabled !== false)
     }
     needsRender = true
   }
@@ -916,6 +919,16 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
 
   return {
     reset, scatter,
+    returnHome() {
+      const index = journey.state.index
+      if (!journey.returnHome(paused)) return
+      // Reuse only the departed balloon; the composition, music and palette stay live.
+      flight.reset(); flightScale = 1
+      lifecycle.restore(index)
+      launch(index)
+      if (paused) { clearJourney(); updateInstances() }
+      needsRender = true
+    },
     toggleMusic() { if (selectedMusic < 0) selectMusic(0); else music.toggle() },
     selectTrack(mood) {
       if (musicState.mood === mood && selectedMusic >= 0) { music.toggle(); return }
@@ -925,7 +938,9 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     setPaused(value) {
       paused = value; accumulator = 0; needsRender = true
       if (value) {
+        const wasReturning = journey.state.phase === 'returning'
         journey.skipTravel()
+        if (wasReturning) clearJourney()
         onCancel(); burstAudio.stop()
         // Pausing / reduced motion completes arrivals in place, never off-screen.
         interactiveBodies.forEach((body, index) => {

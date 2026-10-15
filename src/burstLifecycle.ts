@@ -73,15 +73,17 @@ export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (ind
       }
     })
   }
+  const restore = (index: number) => {
+    const state = states[index]
+    state.phase = 'live'; state.age = state.charge = state.generation = 0
+    size(index, 1); state.previousScale = 1; bodies[index].enabled = true
+  }
   const reset = () => {
     pops = 0
-    states.forEach((state, index) => {
-      state.phase = 'live'; state.age = state.charge = state.generation = 0
-      size(index, 1); state.previousScale = 1; bodies[index].enabled = true
-    })
+    states.forEach((_state, index) => restore(index))
   }
   return {
-    states, step, start, reset,
+    states, step, start, reset, restore,
     canGrab: (index: number) => bodies[index]?.enabled !== false && (states[index]?.phase === 'live' || states[index]?.phase === 'inflating'),
     scale: (index: number, alpha = 1) => states[index].radius * THREE.MathUtils.lerp(states[index].previousScale, states[index].scale, alpha) * reactionScale(index),
     get pops() { return pops },

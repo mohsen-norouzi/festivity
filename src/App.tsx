@@ -15,6 +15,8 @@ const tracks = Object.entries(MUSIC_MOODS) as [MoodId, (typeof MUSIC_MOODS)[Mood
 export default function App() {
   const host = useRef<HTMLDivElement>(null)
   const destinationHeading = useRef<HTMLHeadingElement>(null)
+  const logoButton = useRef<HTMLButtonElement>(null)
+  const returnRequested = useRef(false)
   const [journeyPhase, setJourneyPhase] = useState<JourneyPhase>('idle')
   const scene = useRef<OrnamentScene | null>(null)
   const cursor = useRef<HTMLDivElement>(null)
@@ -96,7 +98,29 @@ export default function App() {
 
   useEffect(() => {
     if (journeyPhase === 'popped') destinationHeading.current?.focus({ preventScroll: true })
+    if (journeyPhase === 'idle' && returnRequested.current) {
+      returnRequested.current = false
+      logoButton.current?.focus({ preventScroll: true })
+    }
   }, [journeyPhase])
+
+  useEffect(() => {
+    if (journeyPhase !== 'popped' || menuOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.preventDefault()
+      returnToBalloons()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [journeyPhase, menuOpen])
+
+  const returnToBalloons = () => {
+    if (journeyPhase !== 'popped') return
+    returnRequested.current = true
+    setMenuOpen(false)
+    scene.current?.returnHome()
+  }
 
   const reset = () => {
     scene.current?.reset()
@@ -123,7 +147,7 @@ export default function App() {
       <div ref={cursor} className="scene-cursor pointer-events-none" aria-hidden="true"><span /></div>
 
       <header className="hero-header absolute inset-x-0 top-0 z-20 flex items-center justify-between">
-        <button className="wordmark" onClick={reset} aria-label={journeyPhase === 'idle' ? 'MUSYNC — reset the scene' : 'MUSYNC — return to the music'} title={journeyPhase === 'idle' ? 'MUSYNC' : 'Return to the music'}><img src="/brand/musync-logo-white.svg" alt="MUSYNC" width="429" height="109" /></button>
+        <button ref={logoButton} className="wordmark" onClick={journeyPhase === 'idle' || journeyPhase === 'ascending' ? reset : returnToBalloons} aria-label={journeyPhase === 'idle' ? 'MUSYNC — reset the scene' : 'MUSYNC — return to the music'} title={journeyPhase === 'idle' ? 'MUSYNC' : 'Return to the music'}><img src="/brand/musync-logo-white.svg" alt="MUSYNC" width="429" height="109" /></button>
         <div aria-hidden={journeyPhase !== 'idle'} className="study-index hidden items-center justify-between md:flex" aria-label="An ecosystem for artists, fans, and Dream Movers">
           <span>ARTISTS</span><span>FANS</span><span>DREAM MOVERS</span><span>OWNERSHIP</span><span>CONNECTION</span>
         </div>
@@ -214,6 +238,11 @@ export default function App() {
 
       <section className="journey-page" aria-label="Page-1" aria-hidden={journeyPhase !== 'popped'} inert={journeyPhase !== 'popped'}>
         <h1 ref={destinationHeading} tabIndex={-1}>Page-1</h1>
+        <button className="journey-back" onClick={returnToBalloons} aria-keyshortcuts="Escape">
+          <span className="journey-back-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4v15m-6-6 6 6 6-6" /></svg></span>
+          <span>Back to balloons</span>
+          <kbd aria-hidden="true">esc</kbd>
+        </button>
       </section>
 
       {!ready && !error && <div className="entrance-signal pointer-events-none" role="status" aria-label="The sculpture is arriving"><i /><i /><i /><i /><i /></div>}

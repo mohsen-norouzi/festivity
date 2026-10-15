@@ -141,3 +141,23 @@ describe('single-click inflation, burst, and replacement', () => {
     expect(life.pops).toBe(0)
   })
 })
+
+
+test('restoring a departed balloon leaves its neighbors and their motion untouched', () => {
+  const bodies = [makeBody(), makeBody()]
+  let controlled: number | null = 2.4
+  const life = createBurstLifecycle(bodies, () => {}, () => {}, () => 1, index => index === 0 ? controlled : null)
+  life.step(dt)
+  bodies[0].enabled = false
+  bodies[1].velocity.set(1, 2, 3)
+  life.start(1); advance(life, .3)
+  const neighbor = { ...life.states[1] }, neighborRadius = bodies[1].radius
+  controlled = null
+  life.restore(0)
+  expect(life.canGrab(0)).toBe(true)
+  expect(bodies[0].radius).toBe(1)
+  expect(life.scale(0, 0)).toBe(1)
+  expect(life.states[1]).toEqual(neighbor)
+  expect(bodies[1].radius).toBe(neighborRadius)
+  expect(bodies[1].velocity.toArray()).toEqual([1, 2, 3])
+})
