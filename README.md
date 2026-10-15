@@ -1,6 +1,6 @@
 # Festivity — MUSYNC hero study
 
-A local, single-hero React and Three.js experiment using MUSYNC’s official logo and core messaging. The workspace/project name remains Festivity. A floating sculpture of rounded music tiles, capsules, small satellites, a reflective orbit, and iridescent bubbles. Three tiny transparent glass capsules sit within the same hero: artist–fan details, a random-track discovery button, and the MUSYNC waitlist invitation. Scuffed black lacquer, warm coral, vivid pink, aged paper, lavender, and clear rose glass sit against bright peach-and-violet concert haze. The official symbol, distressed manifesto lettering, a live-session image, and a vinyl record appear on the rounded faces. The dark inscription ribbon reads “ARTISTS OWN TOMORROW.” No extra pages or deployment.
+A local React and Three.js hero and balloon-transition experiment using MUSYNC’s official logo and core messaging. The workspace/project name remains Festivity. A floating sculpture of rounded music tiles, capsules, small satellites, a reflective orbit, and iridescent bubbles. Three tiny transparent glass capsules sit within the same hero: artist–fan details, a random-track discovery button, and the MUSYNC waitlist invitation. Scuffed black lacquer, warm coral, vivid pink, aged paper, lavender, and clear rose glass sit against bright peach-and-violet concert haze. The official symbol, distressed manifesto lettering, a live-session image, and a vinyl record appear on the rounded faces. The dark inscription ribbon reads “ARTISTS OWN TOMORROW.” The balloon journey reveals one placeholder section, Page-1. No deployment.
 
 ## Run
 
@@ -21,13 +21,13 @@ bun run preview
 
 - Move through the sculpture to push the shapes.
 - Hold and drag a piece; release it to let it settle. Cubes bend the wire, and wire tension gently pushes and turns them in return.
-- Click a shape once to play its music and start its individual reaction. Repeated shape clicks never pause or restart the song; selecting a different material changes tracks. Waveform bars animate independently, the heart changes through warm colors and beats, the black text tile gains golden lettering, notes sway, headphones pulse, clouds float, globes turn, and stars twinkle. Body materials stay original except for the heart. Selecting another shape returns the previous reaction to rest.
+- Click a shape once to play its music and start an upward balloon journey. Additional clicks during the journey cannot interrupt it. The music continues on Page-1; the header menu can select another recording. Waveform bars animate independently, the heart changes through warm colors and beats, the black text tile gains golden lettering, notes sway, headphones pulse, clouds float, globes turn, and stars twinkle. Body materials stay original except for the heart. Selecting another shape returns the previous reaction to rest.
 - The “Surprise me” capsule draws a different track without repeating the remaining deck. The connection card reveals the artist–fan benefits, and the glass invitation opens the existing waitlist. The header menu opens the MUSYNC Mix: seven local tracks with live selection, keyboard navigation, and matching sculpture reactions. Music begins only after a gesture, pauses while the tab is hidden, and stops on reset.
-- One click starts continuous inflation for 2.6 seconds, then the shape pops. Further clicks do not restart or accelerate that countdown. Each selected shape finishes its own inflation even after another is selected. Holding and dragging do not start inflation. A matching replacement floats in at its original size; music continues through the pop and replacement.
-- Oil stretches, falls, and leaves wet patches on the moving shapes. Reset clears both pressure and oil.
+- The selected tile or small bubble remains in the live physics simulation as it inflates, rises, and leads the camera up exactly one viewport height over 3.7 seconds. Without stopping at arrival, it pops and the centered Page-1 heading appears. Holding and dragging do not launch a journey. The header logo returns to the hero and resets the sculpture; it also cancels an in-progress flight.
+- The destination pop reuses the existing liquid effects and material palette. Its drops fall freely on the empty destination. Reset clears the effects.
 - Click the large MUSYNC play/waveform symbol to scatter the composition.
 - The footer shows a small spinning record and the current title/artist. Reset by clicking the header logo. The footer and menu contain no animation, fullscreen, reset, or mute controls.
-- Touch dragging and reduced-motion preferences are supported.
+- Touch dragging and reduced-motion preferences are supported. Reduced motion skips the climb and pops immediately at the destination. Hidden tabs suspend the journey clock.
 
 ## Rendering
 
@@ -40,11 +40,12 @@ bun run preview
 - `src/orbits.ts`: a dynamically updated cable mesh with continuous transported normals, plus five instanced iridescent glass bubbles.
 - `src/studio.ts`: a baked peach/violet lighting environment and a responsive, cropped concert-haze backdrop. The background texture reallocates safely on resize.
 - `src/wirePhysics.ts`: a 96-node closed cable with stretch/bending constraints, a weak rest spring, traveling loads, and two-way rounded-cube contact at the same 90 Hz fixed step. Node and segment contacts keep the wire outside the cube surfaces.
-- `src/burstLifecycle.ts`: single-click continuous inflation, independent body countdowns, one pop per cycle, and matching replacements.
+- `src/balloonJourney.ts`: one visible-time clock coordinates inflation, upward motion, exactly one camera-height move, arrival, and one immediate arrival pop. `balloonFlight.ts` lifts the original body with a buoyant spring; `bodyContacts.ts` keeps contacts reciprocal while inflation changes the collider and visible size together. The destination haze uses the selected material’s palette. The active balloon keeps its existing geometry and materials; no extra renderer or asset downloads are needed.
+- `src/burstLifecycle.ts`: shared body sizing and the retained standalone inflation/replacement machinery; hero clicks now use the balloon journey.
 - `src/liquidCollision.ts`: continuous oil contacts against translating and rotating rounded bodies, including drop width and full liquid strands. Oil and cubes share the fixed simulation step.
 - `src/contactLighting.ts`: all-neighbor contact lighting compressed into directional coefficients, with three texture samples per vertex and no nearest-neighbor switching.
 - `src/JellyCard.tsx`: slim, transparent capsules with a subtle elastic silhouette, damped pointer tilt, a gentle press response, and crisp DOM lettering. Animation frames run only while responding or settling; no additional WebGL pass, textures, or assets. Reduced motion disables the deformation.
-- `src/App.tsx` and `src/style.css`: accessible controls and responsive hero layout.
+- `src/App.tsx` and `src/style.css`: accessible controls, the translated hero layer, and the centered Page-1 placeholder.
 
 Native MSAA and 1.5–2× rendering preserve edges within a five-million-pixel budget. The glass refraction buffer uses 35% of the render resolution; rough refraction conceals the reduced resolution while keeping the sculpture sharp. Small satellites use lighter geometry. Paused scenes stop rendering; hidden tabs suspend simulation. All assets are local or procedural.
 
@@ -54,7 +55,7 @@ React + TypeScript + Vite + Bun + Tailwind CSS + Three.js. Festivity is an exper
 
 ## Physics checks
 
-Run `bun test` for cable stretch/stability, reciprocal cube reaction, rounded-surface clearance during dragging, wave propagation/damping, deterministic reset, continuous inflation and repeated-click protection, oil adhesion and pinch-off, swept droplet contacts, moving-cube collision regressions, local track mappings, pause/resume, silent startup, crossfades, rapid switching and stale playback cancellation, independent reactions, and heartbeat collider/render agreement.
+Run `bun test` for balloon arrival/pop ordering, repeat-click protection, return/reset, frame-rate independence, reduced motion, cable stretch/stability, reciprocal cube reaction, rounded-surface clearance during dragging, wave propagation/damping, deterministic reset, continuous inflation and repeated-click protection, oil adhesion and pinch-off, swept droplet contacts, moving-cube collision regressions, local track mappings, pause/resume, silent startup, crossfades, rapid switching and stale playback cancellation, independent reactions, and heartbeat collider/render agreement.
 
 ## Local songs
 
@@ -72,7 +73,7 @@ The uploaded recordings live in `public/songs/`. Assignments and displayed metad
 
 ## Brand source
 
-The full white SVG logo is from https://www.musync.me/assets/Logo_White.svg; the standalone symbol uses its original first path. The favicon is from https://www.musync.me/en/. The underground manifesto and tile phrases follow the supplied design reference. Public brand assets are stored in `public/brand/`. The existing hero CTA opens the live MUSYNC waitlist in a new tab; no signup form or additional section is included locally.
+The full white SVG logo is from https://www.musync.me/assets/Logo_White.svg; the standalone symbol uses its original first path. The favicon is from https://www.musync.me/en/. The underground manifesto and tile phrases follow the supplied design reference. Public brand assets are stored in `public/brand/`. The existing hero CTA opens the live MUSYNC waitlist in a new tab; no signup form is included locally. Page-1 is a content placeholder only.
 
 ## Image assets
 

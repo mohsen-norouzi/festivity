@@ -254,3 +254,15 @@ svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width:
 }
 @media (max-height: 650px) and (min-width: 768px) { .connection-jelly { top: auto; bottom: 15%; } .study-caption { top: 15%; } .study-caption h1 { font-size: 54px; } .caption-manifesto { margin-top: 18px; font-size: 11px; } .invitation-jelly { top: calc(15% + 217px); } .glass-pill { min-height: 46px; padding-top: 8px; padding-bottom: 8px; } }
 @media (prefers-reduced-motion: reduce) { .glass-pill { transform: none; } .jelly-anchor { animation: none; } }
+
+/* One camera-height ascent, shared with the WebGL flight clock. */
+.hero-home { position: absolute; inset: 0; z-index: 10; pointer-events: none; transform: translate3d(0, var(--journey-y, 0px), 0); }
+.hero-home button, .hero-home a { pointer-events: auto; }
+.hero-home[inert], .hero-home[inert] * { pointer-events: none; }
+.hero:not([data-journey="idle"]) .scene { cursor: default; }
+.hero:not([data-journey="idle"]) .study-index { opacity: 0; }
+.study-index { transition: opacity .35s; }
+.journey-page { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; pointer-events: none; transform: translate3d(0, calc(var(--journey-y, 0px) - 100%), 0); }
+.journey-page h1 { margin: 0; font-size: clamp(56px, 8vw, 128px); line-height: 1; font-weight: 600; letter-spacing: -.065em; color: #fff7fb; opacity: 0; filter: blur(8px); transform: translateY(14px); transition: opacity .7s ease, filter .7s ease, transform .7s cubic-bezier(.2,.8,.2,1); outline: none; }
+.hero[data-journey="popped"] .journey-page h1 { opacity: 1; filter: blur(0); transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .journey-page h1 { filter: none; transform: none; } }

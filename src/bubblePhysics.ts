@@ -44,7 +44,7 @@ export function createBubblePhysics() {
   const silhouetteSupports: Float64Array[] = []
   let protectSilhouettes = false
 
-  const beginStep = (dt: number, cubes: readonly WireBody[], time: number, settling = false, viewRotation?: THREE.Quaternion, interaction?: BubbleInteraction) => {
+  const beginStep = (dt: number, cubes: readonly WireBody[], time: number, settling = false, viewRotation?: THREE.Quaternion, interaction?: BubbleInteraction, integrateBody?: (body: BubbleBody, dt: number) => boolean) => {
     protectSilhouettes = viewRotation !== undefined
     if (viewRotation) {
       viewInverse.copy(viewRotation).invert()
@@ -68,6 +68,7 @@ export function createBubblePhysics() {
     })
     bodies.forEach((body, i) => {
       if (body.enabled === false) return
+      if (integrateBody?.(body, dt)) return
       body.previous.copy(body.position)
       delta.copy(body.home).sub(body.position).multiplyScalar(1.6)
       if (!settling) {

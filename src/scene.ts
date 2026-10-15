@@ -5,6 +5,9 @@ import { createUndergroundSurfaces, type TileArtwork } from './undergroundSurfac
 import { createOrbits } from './orbits'
 import { createContactLighting } from './contactLighting'
 import { createBurstLifecycle } from './burstLifecycle'
+import { createBalloonJourney, type JourneyPhase } from './balloonJourney'
+import { createBalloonFlight } from './balloonFlight'
+import { createBodyContacts } from './bodyContacts'
 import { createBurstEffects } from './burstEffects'
 import { createBurstAudio } from './burstAudio'
 import { createEntrance, shuffledIndices } from './entrance'
@@ -85,7 +88,7 @@ function randomGenerator(seed: number) {
 }
 
 /** A small fixed-step sphere solver: attractive force, contact impulses, and drag springs. */
-export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement, onReady: () => void, onError: () => void, onMusic: (state: MusicState) => void): OrnamentScene {
+export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement, onReady: () => void, onError: () => void, onMusic: (state: MusicState) => void, onJourney: (phase: JourneyPhase) => void = () => {}): OrnamentScene {
   const startedAt = performance.now()
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' })
   renderer.setClearColor(0x000000, 0)
@@ -323,6 +326,10 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   let ribbonReady = false, ribbonReveal = 0
   const baseRadii = interactiveBodies.map(body => body.radius)
   const burstOrigin = new THREE.Vector3()
+  const journey = createBalloonJourney(onJourney)
+  const flight = createBalloonFlight()
+  const solveBodyContacts = createBodyContacts()
+  let flightScale = 1, flightPopped = false, flightContacts = 0, neighborMotion = 0
   const lifecycle = createBurstLifecycle(interactiveBodies, (index, body) => {
     burstOrigin.copy(body.position)
     burstEffects.burst({ position: burstOrigin, radius: body.radius, baseRadius: baseRadii[index], halfSize: body.halfSize, rotation: body.rotation, velocity: body.velocity, shapePower: body.shapePower, finish: index < COUNT ? pieces[index].finish : 'bubble', isSphere: body.isSphere === true })
@@ -364,7 +371,85 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     cluster.worldToLocal(offset)
     body.position.copy(offset)
     if (index < COUNT) body.rotation.copy(bodies[index].rest)
-  }, index => reactions.scale(index))
+  }, index => reactions.scale(index), index => journey.state.phase !== 'idle' && index === journey.state.index ? flightScale : null)
+  const flightStart = new THREE.Vector3(), flightTarget = new THREE.Vector3()
+  let flightRadius = 1
+  const beginJourney = (index: number) => {
+    if (journey.state.phase !== 'idle' || !lifecycle.canGrab(index)) return
+    const body = interactiveBodies[index]
+    flightStart.copy(body.position); cluster.localToWorld(flightStart)
+    flightRadius = baseRadii[index] * cluster.scale.x
+    flightScale = 1; flightPopped = false; flightContacts = 0; neighborMotion = 0
+    flight.start(body)
+    journey.start(index, paused)
+    musicVisuals.setDestination(index < COUNT ? pieces[index].finish : 'bubble')
+    active = false
+    cursor.classList.remove('visible', 'is-dragging', 'is-charging')
+    // Reduced motion skips the climb and bursts immediately at the destination.
+    if (paused) {
+      advanceJourney(STEP)
+      lifecycle.step(STEP)
+      body.position.copy(flightTarget); body.previous.copy(body.position)
+      popJourney(); updateInstances()
+    }
+    needsRender = true
+  }
+  const advanceJourney = (dt: number) => {
+    journey.step(dt)
+    if (flightPopped || journey.state.phase === 'idle') return
+    const { travel, rise, growth } = journey.state
+    const viewHeight = camera.top - camera.bottom
+    const destinationRadius = Math.max(flightRadius * 1.15, Math.min(viewHeight * .24, (camera.right - camera.left) * .28))
+    flightScale = THREE.MathUtils.lerp(1, destinationRadius / flightRadius, growth)
+    flightTarget.set(
+      THREE.MathUtils.lerp(flightStart.x, 0, travel),
+      THREE.MathUtils.lerp(flightStart.y, viewHeight, rise),
+      flightStart.z,
+    )
+    cluster.worldToLocal(flightTarget)
+    flight.aim(flightTarget, dt)
+  }
+  const popJourney = () => {
+    if (journey.state.phase !== 'popped' || flightPopped) return
+    flightPopped = true
+    const index = journey.state.index, body = interactiveBodies[index]
+    // Burst from the actual solved position and retain the balloon's upward momentum.
+    burstEffects.burst({ position: body.position, radius: body.radius, baseRadius: baseRadii[index], halfSize: body.halfSize, rotation: body.rotation, velocity: body.velocity, shapePower: body.shapePower, finish: index < COUNT ? pieces[index].finish : 'bubble', isSphere: index >= COUNT })
+    burstAudio.play(baseRadii[index], index >= COUNT)
+    if (import.meta.env.DEV) host.dataset.journeyPopSpeed = body.velocity.y.toFixed(3)
+    body.enabled = false
+    flight.reset()
+  }
+  const updateJourney = () => {
+    const { phase, index, travel, growth } = journey.state
+    const viewHeight = camera.top - camera.bottom
+    camera.position.y = travel * viewHeight
+    camera.updateMatrixWorld()
+    const pageY = travel * host.clientHeight
+    host.parentElement?.style.setProperty('--journey-y', `${pageY.toFixed(3)}px`)
+    musicVisuals.setTravel(travel)
+    host.dataset.journeyPhase = phase
+    if (import.meta.env.DEV) {
+      host.dataset.journeyTravel = travel.toFixed(4)
+      host.dataset.journeyScreenOffset = pageY.toFixed(1)
+      host.dataset.journeyBalloon = String(index)
+      host.dataset.journeyPops = flightPopped ? '1' : '0'
+      host.dataset.journeyScale = growth.toFixed(3)
+      host.dataset.journeyContacts = String(flightContacts)
+      host.dataset.journeyNeighborMotion = neighborMotion.toFixed(3)
+      host.dataset.journeyBalloonEnabled = String(interactiveBodies[index].enabled !== false)
+    }
+    needsRender = true
+  }
+  const clearJourney = () => {
+    flight.reset(); flightPopped = false; flightScale = 1
+    journey.reset()
+    camera.position.y = 0; camera.updateMatrixWorld()
+    musicVisuals.setTravel(0)
+    host.parentElement?.style.setProperty('--journey-y', '0px')
+    host.dataset.journeyPhase = 'idle'
+    for (const key of ['journeyTravel', 'journeyScreenOffset', 'journeyPops', 'journeyBalloon', 'journeyScale', 'journeyContacts', 'journeyNeighborMotion', 'journeyBalloonEnabled', 'journeyPopSpeed']) delete host.dataset[key]
+  }
   const renderBodyRadiusAt = (index: number) => lifecycle.scale(index, renderAlpha)
   const bubbleRadiusAt = (index: number) => lifecycle.scale(COUNT + index, renderAlpha)
   let renderAlpha = 1
@@ -372,11 +457,13 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   const step = (dt: number, settling = false) => {
     elapsed += settling ? 0 : dt
     if (!settling) {
+      advanceJourney(dt)
       lifecycle.step(dt)
     }
     for (let i = 0; i < COUNT; i++) {
       const body = bodies[i]
       if (body.enabled === false) continue
+      if (!settling && flight.integrate(body, dt)) continue
       const { position: p, velocity: v, radius: r } = body
       body.previous.copy(p)
       // Gentle springs preserve the composition while every piece remains tangible.
@@ -411,34 +498,8 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       p.addScaledVector(v, dt)
     }
 
-    // Sequential impulses with mass-weighted positional correction keep surfaces touching.
-    for (let iteration = 0; iteration < 3; iteration++) {
-      for (let i = 0; i < COUNT; i++) {
-        const a = bodies[i]
-        if (a.enabled === false) continue
-        for (let j = i + 1; j < COUNT; j++) {
-          const b = bodies[j]
-          if (b.enabled === false) continue
-          delta.subVectors(b.position, a.position)
-          const minDistance = (a.radius + b.radius) * .94
-          const d2 = delta.lengthSq()
-          if (d2 >= minDistance * minDistance || d2 < .000001) continue
-          const distance = Math.sqrt(d2)
-          delta.multiplyScalar(1 / distance)
-          const aWeight = b.mass / (a.mass + b.mass)
-          const bWeight = 1 - aWeight
-          const correction = (minDistance - distance) * .84
-          a.position.addScaledVector(delta, -correction * aWeight)
-          b.position.addScaledVector(delta, correction * bWeight)
-          const separationSpeed = (b.velocity.x - a.velocity.x) * delta.x + (b.velocity.y - a.velocity.y) * delta.y + (b.velocity.z - a.velocity.z) * delta.z
-          if (separationSpeed < 0) {
-            const impulse = -separationSpeed * 1.28
-            a.velocity.addScaledVector(delta, -impulse * aWeight)
-            b.velocity.addScaledVector(delta, impulse * bWeight)
-          }
-        }
-      }
-    }
+    const ascendingIndex = journey.state.phase !== 'idle' && !flightPopped ? journey.state.index : -1
+    flightContacts += solveBodyContacts(bodies, ascendingIndex, ascendingIndex >= 0 ? 6 : 3)
 
     if (!settling) {
       for (const body of bodies) {
@@ -455,8 +516,19 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     }
     bubbleInteraction.hover = active && dragging < 0
     bubbleInteraction.dragging = dragging >= COUNT && !canClick ? dragging - COUNT : -1
-    orbits.step(dt, bodies, elapsed, settling, bubbleInteraction)
-    if (!settling) burstEffects.step(dt, interactiveBodies)
+    orbits.step(dt, bodies, elapsed, settling, bubbleInteraction, settling ? undefined : flight.integrate)
+    if (ascendingIndex >= 0) {
+      // Cable and bubble reactions can move tiles too. Finish with mutual contact
+      // correction rather than overwriting the balloon's position with an animation.
+      for (let i = 0; i < 3; i++) {
+        flightContacts += solveBodyContacts(bodies, ascendingIndex, 2)
+        orbits.solveContacts()
+      }
+      if (import.meta.env.DEV) interactiveBodies.forEach((body, i) => {
+        if (i !== ascendingIndex && body.enabled !== false) neighborMotion += body.position.distanceTo(body.previous)
+      })
+    }
+    if (!settling) { popJourney(); burstEffects.step(dt, interactiveBodies) }
   }
 
   const updateInstances = (alpha = 1) => {
@@ -477,6 +549,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   }
 
   const reset = () => {
+    clearJourney()
     dragging = -1
     canClick = false; feedbackIndex = -1
     reactions.reset()
@@ -499,7 +572,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   }
 
   const scatter = () => {
-    if (paused) return
+    if (paused || journey.state.phase !== 'idle') return
     for (const body of bodies) {
       if (body.enabled === false) continue
       delta.copy(body.position).normalize()
@@ -555,11 +628,12 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
   }
 
   const onMove = (event: PointerEvent) => {
+    if (journey.state.phase !== 'idle') return
     projectPointer(event)
     if (pointerId !== null && pressOrigin.distanceTo(cursorTarget) > 9) canClick = false
   }
   const onDown = (event: PointerEvent) => {
-    if (event.button !== 0 || pointerId !== null) return
+    if (event.button !== 0 || pointerId !== null || journey.state.phase !== 'idle') return
     projectPointer(event)
     burstAudio.unlock()
     raycaster.setFromCamera(pointer, camera)
@@ -586,11 +660,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     const clicked = dragging
     const isClick = canClick && clicked >= 0 && performance.now() - pressTime < 450 && pressOrigin.distanceTo(new THREE.Vector2(event.clientX, event.clientY)) <= 9
     if (isClick) selectMusic(clicked)
-    if (isClick && !paused) {
-      // Starting an already inflating shape is a no-op; its song keeps playing.
-      lifecycle.start(clicked)
-      feedbackIndex = clicked
-    }
+    if (isClick) beginJourney(clicked)
     const releasedPointer = pointerId
     pointerId = null
     if (host.hasPointerCapture(releasedPointer)) host.releasePointerCapture(releasedPointer)
@@ -716,6 +786,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     if (import.meta.env.DEV) {
       if (!sampleTime) sampleTime = now
       if (++frameCount === 120) {
+        host.dataset.physicsTime = elapsed.toFixed(3)
         host.dataset.fps = ((frameCount * 1000) / (now - sampleTime)).toFixed(0)
         host.dataset.drawCalls = String(renderer.info.render.calls)
         host.dataset.triangles = String(renderer.info.render.triangles)
@@ -728,6 +799,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     }
     const sound = music.sample()
     if (reactions.update(dt, selectedMusic, musicState.audible, sound, paused)) needsRender = true
+    const travelling = journey.state.phase !== 'idle'
     entrance.step(dt, launch)
     if (wireReady && entrance.entered > 0 && wireReveal < 1) {
       wireReveal = paused ? 1 : Math.min(1, wireReveal + dt * .9)
@@ -739,7 +811,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
       orbits.ribbon.reveal(ribbonReveal * ribbonReveal * (3 - 2 * ribbonReveal))
       needsRender = true
     }
-    if (paused && (needsRender || settleFrames > 0)) {
+    if (!travelling && paused && (needsRender || settleFrames > 0)) {
       if (settleFrames > 0) { for (let i = 0; i < 4; i++) step(STEP, true); settleFrames-- }
       orbits.rest()
       bodies.forEach(body => body.previous.copy(body.position))
@@ -779,6 +851,15 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
         host.dataset.replacements = String(lifecycle.states.filter(state => state.phase === 'arriving').length)
       }
       needsRender = true
+    }
+    if (travelling) {
+      if (paused && !flightPopped) {
+        advanceJourney(STEP); lifecycle.step(STEP)
+        const body = interactiveBodies[journey.state.index]
+        body.position.copy(flightTarget); body.previous.copy(body.position)
+        popJourney(); updateInstances()
+      }
+      updateJourney()
     }
     if (musicVisuals.update(dt, sound.energy, paused || !musicState.audible)) needsRender = true
     host.parentElement?.style.setProperty('--music-energy', sound.energy.toFixed(3))
@@ -837,10 +918,11 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     setPaused(value) {
       paused = value; accumulator = 0; needsRender = true
       if (value) {
+        journey.skipTravel()
         onCancel(); burstAudio.stop()
         // Pausing / reduced motion completes arrivals in place, never off-screen.
         interactiveBodies.forEach((body, index) => {
-          if (entrance.hasEntered(index) && elapsed - arrivedAt[index] < 5) {
+          if (journey.state.phase === 'idle' && entrance.hasEntered(index) && elapsed - arrivedAt[index] < 5) {
             body.position.copy(body.home); body.previous.copy(body.home); body.velocity.set(0, 0, 0)
             if (index < COUNT) body.rotation.copy(bodies[index].rest)
           }
@@ -852,6 +934,7 @@ export function createOrnamentScene(host: HTMLDivElement, cursor: HTMLDivElement
     dispose() {
       if (disposed) return
       disposed = true
+      flight.reset()
       music.dispose()
       burstAudio.stop()
       cancelAnimationFrame(raf)

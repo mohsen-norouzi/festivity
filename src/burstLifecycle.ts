@@ -10,7 +10,7 @@ export const INFLATION_SECONDS = 2.6
 const REPLACE_DELAY = .26
 
 /** Reuse each ornament's body and GPU assets for its matching replacement. */
-export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (index: number, body: BurstBody) => void, spawn: (index: number, body: BurstBody, generation: number) => void, reactionScale: (index: number) => number = () => 1) {
+export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (index: number, body: BurstBody) => void, spawn: (index: number, body: BurstBody, generation: number) => void, reactionScale: (index: number) => number = () => 1, controlledScale: (index: number) => number | null = () => null) {
   const states = bodies.map(body => ({
     radius: body.radius, halfSize: body.halfSize.clone(), mass: body.mass,
     phase: 'live' as 'live' | 'inflating' | 'gone' | 'arriving', age: 0, charge: 0, scale: 1, previousScale: 1, generation: 0,
@@ -36,6 +36,8 @@ export function createBurstLifecycle(bodies: readonly BurstBody[], onBurst: (ind
     states.forEach((state, index) => {
       const body = bodies[index]
       state.previousScale = state.scale
+      const externalScale = controlledScale(index)
+      if (externalScale !== null) { size(index, externalScale); return }
       if (state.phase === 'gone') {
         state.age += dt
         if (state.age >= REPLACE_DELAY) {

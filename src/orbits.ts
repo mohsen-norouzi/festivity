@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { createWirePhysics, WIRE_RADIUS, type WireBody } from './wirePhysics'
-import { createBubblePhysics, type BubbleInteraction } from './bubblePhysics'
+import { createBubblePhysics, type BubbleBody, type BubbleInteraction } from './bubblePhysics'
 import { createGlassRibbon } from './glassRibbon'
 
 export function createOrbits(parent: THREE.Group, anisotropy = 1) {
@@ -13,14 +13,14 @@ export function createOrbits(parent: THREE.Group, anisotropy = 1) {
   let contactBodies: readonly WireBody[] = []
   let contactSettling = false
   const solveBubbleContacts = () => bubblePhysics.solveContacts(contactBodies, contactSettling)
-  const step = (dt: number, cubes: readonly WireBody[], time: number, settling = false, interaction?: BubbleInteraction) => {
+  const step = (dt: number, cubes: readonly WireBody[], time: number, settling = false, interaction?: BubbleInteraction, integrateBody?: (body: BubbleBody, dt: number) => boolean) => {
     contactBodies = cubes
     contactSettling = settling
     // Reuse the collision list and callback; no per-frame allocations.
     colliders.length = 0
     for (const cube of cubes) if (cube.enabled !== false) colliders.push(cube)
     for (const bubble of bubblePhysics.bodies) if (bubble.enabled !== false) colliders.push(bubble)
-    bubblePhysics.beginStep(dt, cubes, time, settling, parent.quaternion, interaction)
+    bubblePhysics.beginStep(dt, cubes, time, settling, parent.quaternion, interaction, integrateBody)
     wire.step(dt, colliders, time, settling, solveBubbleContacts)
     ribbon.step(dt, colliders, time, settling, solveBubbleContacts)
   }
@@ -111,5 +111,5 @@ export function createOrbits(parent: THREE.Group, anisotropy = 1) {
   update()
   const reset = () => { wire.reset(); ribbon.reset(); bubblePhysics.reset() }
   const rest = () => { wire.rest(); ribbon.rest(); bubblePhysics.rest() }
-  return { wire, ribbon, wireMesh: orbit, reveal(value: number) { reveal = value; orbit.visible = value > 0 }, bubbleMesh: bubbles, bubbleBodies: bubblePhysics.bodies, step, reset, rest, update, dispose() { ribbon.dispose(); geometry.dispose(); material.dispose(); bubbleGeometry.dispose(); bubbleMaterial.dispose(); bubbles.dispose(); parent.remove(group) } }
+  return { wire, ribbon, wireMesh: orbit, reveal(value: number) { reveal = value; orbit.visible = value > 0 }, bubbleMesh: bubbles, bubbleBodies: bubblePhysics.bodies, step, solveContacts: solveBubbleContacts, reset, rest, update, dispose() { ribbon.dispose(); geometry.dispose(); material.dispose(); bubbleGeometry.dispose(); bubbleMaterial.dispose(); bubbles.dispose(); parent.remove(group) } }
 }

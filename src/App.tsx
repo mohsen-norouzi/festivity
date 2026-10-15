@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { MUSIC_MOODS, type MoodId, type MusicState } from './musicMoods'
 import type { OrnamentScene } from './scene'
+import type { JourneyPhase } from './balloonJourney'
 import { JellyCard } from './JellyCard'
 
 function PauseIcon({ paused }: { paused: boolean }) {
@@ -13,6 +14,8 @@ const tracks = Object.entries(MUSIC_MOODS) as [MoodId, (typeof MUSIC_MOODS)[Mood
 
 export default function App() {
   const host = useRef<HTMLDivElement>(null)
+  const destinationHeading = useRef<HTMLHeadingElement>(null)
+  const [journeyPhase, setJourneyPhase] = useState<JourneyPhase>('idle')
   const scene = useRef<OrnamentScene | null>(null)
   const cursor = useRef<HTMLDivElement>(null)
   const menu = useRef<HTMLDivElement>(null)
@@ -45,7 +48,8 @@ export default function App() {
           instance = createOrnamentScene(host.current, cursor.current,
             () => { if (!cancelled) setReady(true) },
             () => { if (!cancelled) setError(true) },
-            state => { if (!cancelled) setMusic(state) })
+            state => { if (!cancelled) setMusic(state) },
+            phase => { if (!cancelled) { setJourneyPhase(phase); if (phase !== 'idle') setMenuOpen(false) } })
           scene.current = instance
           instance.setPaused(preferences.current.paused)
         } catch (cause) {
@@ -90,6 +94,10 @@ export default function App() {
     }
   }, [menuOpen])
 
+  useEffect(() => {
+    if (journeyPhase === 'popped') destinationHeading.current?.focus({ preventScroll: true })
+  }, [journeyPhase])
+
   const reset = () => {
     scene.current?.reset()
     setResetCount(count => count + 1)
@@ -109,14 +117,14 @@ export default function App() {
   }
 
   return (
-    <main className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''} ${music.audible ? 'is-music-playing' : ''} ${song ? 'has-music' : ''}`} style={{ '--mood-accent': song?.accent ?? '#ffc0b3' } as CSSProperties}>
-      <div ref={host} className="scene absolute inset-0" role="img" aria-label="A luminous music sculpture of glass, painted music tiles, and a live concert image. Click a shape once to play its music and inflate it until it pops. Repeated clicks keep the music playing; another shape selects its track. Drag to move; a matching replacement floats in." />
+    <main data-journey={journeyPhase} className={`hero relative isolate h-svh min-h-[440px] w-full overflow-hidden ${ready ? 'is-ready' : ''} ${paused ? 'is-paused' : ''} ${music.audible ? 'is-music-playing' : ''} ${song ? 'has-music' : ''}`} style={{ '--mood-accent': song?.accent ?? '#ffc0b3' } as CSSProperties}>
+      <div ref={host} className="scene absolute inset-0" role="img" aria-label="A luminous music sculpture of glass, painted music tiles, and a live concert image. Click a shape to play its music, inflate it, and float up one screen to Page-1. It pops as it arrives. Drag to move shapes. The MUSYNC logo returns to the music." />
       <div className="grain pointer-events-none absolute inset-0" aria-hidden="true" />
       <div ref={cursor} className="scene-cursor pointer-events-none" aria-hidden="true"><span /></div>
 
       <header className="hero-header absolute inset-x-0 top-0 z-20 flex items-center justify-between">
-        <button className="wordmark" onClick={reset} aria-label="MUSYNC — reset the scene"><img src="/brand/musync-logo-white.svg" alt="MUSYNC" width="429" height="109" /></button>
-        <div className="study-index hidden items-center justify-between md:flex" aria-label="An ecosystem for artists, fans, and Dream Movers">
+        <button className="wordmark" onClick={reset} aria-label={journeyPhase === 'idle' ? 'MUSYNC — reset the scene' : 'MUSYNC — return to the music'} title={journeyPhase === 'idle' ? 'MUSYNC' : 'Return to the music'}><img src="/brand/musync-logo-white.svg" alt="MUSYNC" width="429" height="109" /></button>
+        <div aria-hidden={journeyPhase !== 'idle'} className="study-index hidden items-center justify-between md:flex" aria-label="An ecosystem for artists, fans, and Dream Movers">
           <span>ARTISTS</span><span>FANS</span><span>DREAM MOVERS</span><span>OWNERSHIP</span><span>CONNECTION</span>
         </div>
         <button ref={menuButton} className={`menu-button icon-button ${menuOpen ? 'is-open' : ''}`} aria-label={menuOpen ? 'Close the MUSYNC mix' : 'Explore the MUSYNC mix'} aria-expanded={menuOpen} aria-controls="musync-mix" onClick={() => setMenuOpen(open => !open)}>
@@ -154,53 +162,59 @@ export default function App() {
         <a className="mix-invitation" href="https://www.musync.me/en/#apply" target="_blank" rel="noopener noreferrer"><span>Closer to your artists.</span><span>Join MUSYNC <span aria-hidden="true">↗</span></span></a>
       </div>}
 
-      <div className="study-caption absolute z-10 pointer-events-none">
-        <h1><span>THE</span><span>MUSIC</span><span>IS <em>OURS.</em></span></h1>
-        <p className="caption-manifesto">Real music. Real connection.<br />Artists and fans.<br />Together.</p>
-      </div>
-
-      <div className="interaction-label absolute z-10 pointer-events-none">
-        <p className="desktop-hint">CLICK TO LISTEN · DRAG TO MOVE</p>
-        <p className="touch-hint">TAP TO LISTEN · DRAG TO MOVE</p>
-        <span className={paused ? 'status-dot is-paused' : 'status-dot'} />
-      </div>
-
-      <JellyCard className="connection-jelly">
-        <button className="jelly-surface glass-pill" onClick={() => setConnectionOpen(open => !open)} aria-expanded={connectionOpen} aria-controls="connection-details" aria-label={connectionOpen ? 'Close the MUSYNC connection details' : 'Why MUSYNC? Discover the artist–fan connection'}>
-          <svg className="pill-symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 8 2-2a5 5 0 0 1 7 7l-2 2M15 16l-2 2a5 5 0 0 1-7-7l2-2M8 16l8-8" /></svg>
-          <span className="pill-copy" id="connection-details"><strong>{connectionOpen ? 'Real-time royalties' : 'Artists & fans'}</strong><span>{connectionOpen ? 'Transparent collaborations' : 'Connected. Directly.'}</span></span>
-          <span className="pill-action" aria-hidden="true">{connectionOpen ? '−' : '+'}</span>
-        </button>
-      </JellyCard>
-      <JellyCard className="discovery-jelly">
-        <button className="jelly-surface glass-pill" disabled={!ready} onClick={discover} aria-label="Surprise me — play a different track">
-          <svg className="pill-symbol" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 9h3c5 0 9 14 14 14h3m-5-5 5 5-5 5M6 23h3c2 0 4-3 6-7m3-5c2-2 3-2 5-2h3m-5-5 5 5-5 5" /></svg>
-          <span className="pill-copy"><strong>Surprise me</strong><span>{music.loading && discoveryCount > 0 ? 'Finding your sound…' : 'Discover a new track'}</span></span>
-          <span className="pill-action" aria-hidden="true">↗</span>
-        </button>
-      </JellyCard>
-      <JellyCard className="invitation-jelly">
-        <a className="jelly-surface glass-pill" href="https://www.musync.me/en/#apply" target="_blank" rel="noopener noreferrer" aria-label="Join MUSYNC — open the waitlist">
-          <img className="pill-brand" src="/brand/musync-symbol-white.svg" alt="" aria-hidden="true" />
-          <span className="pill-copy"><strong>Join MUSYNC</strong><span>Meet your next chapter</span></span>
-          <span className="pill-action" aria-hidden="true">↗</span>
-        </a>
-      </JellyCard>
-
-      <button className="large-x brand-symbol absolute z-10" onClick={scatter} aria-label="Scatter the shapes" title="Scatter the shapes"><img src="/brand/musync-symbol-white.svg" alt="" width="96" height="109" /></button>
-
-      <footer className="hero-footer absolute inset-x-0 bottom-0 z-20 flex items-end justify-between">
-        <div className="material-caption"><p className="font-semibold">No middlemen.</p><p>Closer to your fans.</p></div>
-        <p className="hero-title">MUSIC, IN MOTION.</p>
-        <div className="rotation-note">
-          <span className="rotation-record" aria-hidden="true"><span /><i /></span>
-          <div className="rotation-copy">
-            <p className="rotation-eyebrow">{music.audible ? 'NOW SPINNING' : song ? 'ON YOUR FREQUENCY' : 'THE MUSYNC MIX'}<span>{song ? `${String(tracks.findIndex(([id]) => id === music.mood) + 1).padStart(2, '0')} / 07` : '07 TRACKS'}</span></p>
-            <p className="rotation-title">{song?.name ?? 'Your next favorite is here.'}</p>
-            <p className="rotation-artist">{song?.artist ?? 'Choose a shape. Find your sound.'}</p>
-          </div>
+      <div className="hero-home" inert={journeyPhase !== 'idle'} aria-hidden={journeyPhase !== 'idle'}>
+        <div className="study-caption absolute z-10 pointer-events-none">
+          <h1><span>THE</span><span>MUSIC</span><span>IS <em>OURS.</em></span></h1>
+          <p className="caption-manifesto">Real music. Real connection.<br />Artists and fans.<br />Together.</p>
         </div>
-      </footer>
+
+        <div className="interaction-label absolute z-10 pointer-events-none">
+          <p className="desktop-hint">CLICK TO FLOAT · DRAG TO MOVE</p>
+          <p className="touch-hint">TAP TO FLOAT · DRAG TO MOVE</p>
+          <span className={paused ? 'status-dot is-paused' : 'status-dot'} />
+        </div>
+
+        <JellyCard className="connection-jelly">
+          <button className="jelly-surface glass-pill" onClick={() => setConnectionOpen(open => !open)} aria-expanded={connectionOpen} aria-controls="connection-details" aria-label={connectionOpen ? 'Close the MUSYNC connection details' : 'Why MUSYNC? Discover the artist–fan connection'}>
+            <svg className="pill-symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 8 2-2a5 5 0 0 1 7 7l-2 2M15 16l-2 2a5 5 0 0 1-7-7l2-2M8 16l8-8" /></svg>
+            <span className="pill-copy" id="connection-details"><strong>{connectionOpen ? 'Real-time royalties' : 'Artists & fans'}</strong><span>{connectionOpen ? 'Transparent collaborations' : 'Connected. Directly.'}</span></span>
+            <span className="pill-action" aria-hidden="true">{connectionOpen ? '−' : '+'}</span>
+          </button>
+        </JellyCard>
+        <JellyCard className="discovery-jelly">
+          <button className="jelly-surface glass-pill" disabled={!ready} onClick={discover} aria-label="Surprise me — play a different track">
+            <svg className="pill-symbol" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 9h3c5 0 9 14 14 14h3m-5-5 5 5-5 5M6 23h3c2 0 4-3 6-7m3-5c2-2 3-2 5-2h3m-5-5 5 5-5 5" /></svg>
+            <span className="pill-copy"><strong>Surprise me</strong><span>{music.loading && discoveryCount > 0 ? 'Finding your sound…' : 'Discover a new track'}</span></span>
+            <span className="pill-action" aria-hidden="true">↗</span>
+          </button>
+        </JellyCard>
+        <JellyCard className="invitation-jelly">
+          <a className="jelly-surface glass-pill" href="https://www.musync.me/en/#apply" target="_blank" rel="noopener noreferrer" aria-label="Join MUSYNC — open the waitlist">
+            <img className="pill-brand" src="/brand/musync-symbol-white.svg" alt="" aria-hidden="true" />
+            <span className="pill-copy"><strong>Join MUSYNC</strong><span>Meet your next chapter</span></span>
+            <span className="pill-action" aria-hidden="true">↗</span>
+          </a>
+        </JellyCard>
+
+        <button className="large-x brand-symbol absolute z-10" onClick={scatter} aria-label="Scatter the shapes" title="Scatter the shapes"><img src="/brand/musync-symbol-white.svg" alt="" width="96" height="109" /></button>
+
+        <footer className="hero-footer absolute inset-x-0 bottom-0 z-20 flex items-end justify-between">
+          <div className="material-caption"><p className="font-semibold">No middlemen.</p><p>Closer to your fans.</p></div>
+          <p className="hero-title">MUSIC, IN MOTION.</p>
+          <div className="rotation-note">
+            <span className="rotation-record" aria-hidden="true"><span /><i /></span>
+            <div className="rotation-copy">
+              <p className="rotation-eyebrow">{music.audible ? 'NOW SPINNING' : song ? 'ON YOUR FREQUENCY' : 'THE MUSYNC MIX'}<span>{song ? `${String(tracks.findIndex(([id]) => id === music.mood) + 1).padStart(2, '0')} / 07` : '07 TRACKS'}</span></p>
+              <p className="rotation-title">{song?.name ?? 'Your next favorite is here.'}</p>
+              <p className="rotation-artist">{song?.artist ?? 'Choose a shape. Find your sound.'}</p>
+            </div>
+          </div>
+        </footer>
+      </div>
+
+      <section className="journey-page" aria-label="Page-1" aria-hidden={journeyPhase !== 'popped'} inert={journeyPhase !== 'popped'}>
+        <h1 ref={destinationHeading} tabIndex={-1}>Page-1</h1>
+      </section>
 
       {!ready && !error && <div className="entrance-signal pointer-events-none" role="status" aria-label="The sculpture is arriving"><i /><i /><i /><i /><i /></div>}
       {error && <div className="error-state absolute inset-0 z-10 flex items-center justify-center"><p>This experiment needs WebGL.<br /><span>Please enable hardware acceleration and reload.</span></p></div>}
